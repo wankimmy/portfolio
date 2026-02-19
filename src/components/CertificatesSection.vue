@@ -10,49 +10,44 @@
     - Download/view functionality
 -->
 <template>
-  <section id="certificates" class="min-h-screen py-20 px-8 bg-gradient-to-b from-slate-50 to-white">
-    <div class="max-w-7xl mx-auto">
-      <!-- Section Header -->
+  <section id="certificates" class="min-h-screen py-20 px-8 bg-gradient-to-b from-[#050510] via-slate-900/50 to-[#050510] relative">
+    <div class="max-w-7xl mx-auto relative z-10">
       <div class="text-center mb-16">
-        <h2 class="text-5xl md:text-6xl font-extrabold text-gray-900 mb-4 bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+        <h2 class="text-5xl md:text-6xl font-extrabold mb-4 bg-gradient-to-r from-cyan-400 via-primary to-secondary bg-clip-text text-transparent">
           Professional Certifications
         </h2>
-        <p class="text-xl text-gray-600 font-medium">Professional certifications and achievements</p>
+        <p class="text-xl text-slate-400 font-medium">Credentials from the mission</p>
       </div>
       
-      <!-- Certificates Grid -->
       <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
         <div 
           v-for="cert in certificates" 
           :key="cert.id" 
-          class="bg-white rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border-2 border-gray-100 hover:border-purple-300 group"
+          class="bg-slate-800/70 backdrop-blur rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-cyan-500/20 hover:border-cyan-400/40 group"
         >
-          <!-- Certificate Icon/Image Area -->
-          <div class="relative h-64 bg-gradient-to-br from-purple-500 via-blue-500 to-indigo-600 flex items-center justify-center">
+          <div class="relative h-64 bg-gradient-to-br from-cyan-900/80 via-slate-800 to-primary/80 flex items-center justify-center">
             <div class="absolute inset-0 flex items-center justify-center text-8xl opacity-20">
               🎓
             </div>
             <div class="relative z-10 text-center">
               <div class="text-7xl mb-4">{{ cert.icon }}</div>
-              <div class="text-white font-bold text-sm px-4 py-2 bg-white/20 backdrop-blur-md rounded-full border border-white/30">
+              <div class="text-white font-bold text-sm px-4 py-2 bg-white/10 backdrop-blur-md rounded-full border border-cyan-400/40">
                 {{ cert.issuer }}
               </div>
             </div>
           </div>
           
-          <!-- Certificate Details -->
           <div class="p-8">
-            <h3 class="text-2xl font-bold text-gray-900 mb-3">{{ cert.name }}</h3>
-            <p class="text-gray-600 mb-2 text-sm font-semibold">{{ cert.issuer }}</p>
-            <p class="text-gray-500 text-sm mb-4">{{ cert.date }}</p>
-            <p class="text-gray-700 mb-6 leading-relaxed text-sm">{{ cert.description }}</p>
+            <h3 class="text-2xl font-bold text-white mb-3">{{ cert.name }}</h3>
+            <p class="text-slate-400 mb-2 text-sm font-semibold">{{ cert.issuer }}</p>
+            <p class="text-slate-500 text-sm mb-4">{{ cert.date }}</p>
+            <p class="text-slate-300 mb-6 leading-relaxed text-sm">{{ cert.description }}</p>
             
-            <!-- Action Buttons -->
             <div class="flex gap-3">
               <a 
                 :href="cert.file" 
                 target="_blank"
-                class="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold rounded-xl text-center transition-all hover:from-purple-700 hover:to-blue-700 hover:scale-105 shadow-lg"
+                class="flex-1 px-6 py-3 bg-gradient-to-r from-cyan-500 to-primary text-slate-900 font-bold rounded-xl text-center transition-all hover:from-cyan-400 hover:to-primary hover:scale-105 shadow-lg"
               >
                 📄 View Certificate
               </a>

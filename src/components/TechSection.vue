@@ -1,30 +1,30 @@
 <template>
-  <section id="tech" class="min-h-screen py-20 px-8 bg-gradient-to-b from-white via-purple-50 to-indigo-50">
-    <div class="max-w-7xl mx-auto">
-      <div class="text-center mb-16">
-        <h2 class="text-5xl md:text-6xl font-extrabold text-gray-900 mb-4 bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+  <section id="tech" class="min-h-screen py-10 sm:py-14 md:py-20 px-4 sm:px-6 md:px-8 bg-gradient-to-b from-[#050510] via-slate-900/40 to-[#050510] relative">
+    <div class="max-w-7xl mx-auto relative z-10">
+      <div class="text-center mb-8 sm:mb-12 md:mb-16">
+        <h2 class="text-5xl md:text-6xl font-extrabold mb-4 bg-gradient-to-r from-cyan-400 via-primary to-secondary bg-clip-text text-transparent">
           Technologies
         </h2>
-        <p class="text-xl text-gray-600 font-medium">Technologies I work with</p>
+        <p class="text-xl text-slate-400 font-medium">Tech stack for the mission</p>
       </div>
       
-      <div class="bg-white/80 backdrop-blur-sm p-10 rounded-3xl shadow-2xl border border-purple-100">
-        <div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-8">
+      <div class="bg-slate-800/60 backdrop-blur-sm p-4 sm:p-6 lg:p-10 rounded-3xl shadow-2xl border border-cyan-500/20">
+        <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3 sm:gap-5 md:gap-6 lg:gap-8">
           <div 
             v-for="tech in technologies" 
             :key="tech.name" 
             :title="tech.name"
-            class="flex items-center justify-center p-6 bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-3 hover:scale-110 border-2 border-transparent hover:border-purple-300 group min-h-[160px]"
+            class="tech-item flex items-center justify-center p-3 sm:p-4 md:p-5 lg:p-6 bg-slate-800/80 rounded-xl sm:rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 sm:hover:-translate-y-3 hover:scale-105 sm:hover:scale-110 border border-slate-600/50 hover:border-cyan-400/50 group min-h-[100px] sm:min-h-[130px] md:min-h-[150px] lg:min-h-[160px]"
           >
-              <div class="w-[100px] h-[100px] flex items-center justify-center flex-shrink-0">
-                <img 
-                  :src="tech.icon" 
-                  :alt="tech.name" 
-                  loading="lazy" 
-                  class="w-full h-full object-contain block"
-                  style="filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.15));"
-                />
-              </div>
+            <div class="w-12 h-12 sm:w-14 sm:h-14 md:w-20 md:h-20 lg:w-[90px] lg:h-[90px] xl:w-[100px] xl:h-[100px] flex items-center justify-center flex-shrink-0">
+              <img 
+                :src="tech.icon" 
+                :alt="tech.name" 
+                loading="lazy" 
+                class="w-full h-full object-contain block max-w-full max-h-full"
+                style="filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.15));"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -85,28 +85,16 @@ const technologies = [
 </script>
 
 <style scoped>
-
-@media (max-width: 768px) {
-  .tech-item img {
-    width: 60px !important;
-    height: 60px !important;
-  }
-  
-  .tech-item {
-    min-height: 130px;
-    padding: 1.5rem;
-  }
+/* Ensure images stay within bounds on very small screens */
+.tech-item img {
+  max-width: 100%;
+  max-height: 100%;
 }
 
 @media (max-width: 480px) {
   .tech-item {
-    min-height: 120px;
-    padding: 1rem;
-  }
-  
-  .tech-item img {
-    width: 50px !important;
-    height: 50px !important;
+    min-height: 90px;
+    padding: 0.5rem;
   }
 }
 </style>

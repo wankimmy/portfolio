@@ -5,7 +5,7 @@
  * - CSS Reset
  * - Global typography (Inter font)
  * - Smooth scroll behavior
- * - Custom scrollbar styling
+ * - Scrollbar hidden
  * 
  * @file style.css
  */
@@ -27,17 +27,28 @@
    BASE STYLES
    ============================================ */
 
-/* Smooth scrolling behavior */
-html {
+/* Smooth scrolling; scrollbar hidden everywhere */
+html,
+body {
   scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-/* Body typography and base styles */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/* Body typography and base styles (space theme) */
 body {
   font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: #050510;
+  color: #e2e8f0;
 }
 
 /* App container */
@@ -53,25 +64,4 @@ body {
 /* Smooth transitions for all interactive elements */
 a, button {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* ============================================
-   CUSTOM SCROLLBAR
-   ============================================ */
-
-::-webkit-scrollbar {
-  width: 10px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-::-webkit-scrollbar-thumb {
-  background: linear-gradient(to bottom, #667eea, #764ba2);
-  border-radius: 5px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(to bottom, #764ba2, #667eea);
 }

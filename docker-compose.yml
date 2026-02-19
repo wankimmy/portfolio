@@ -1,0 +1,20 @@
+version: '3.8'
+
+# Local development: uses npm run dev (Vite dev server)
+services:
+  portfolio:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: portfolio-app
+    ports:
+      - "5173:5173"
+    volumes:
+      # Mount source for hot reload
+      - .:/app
+      - /app/node_modules  # keep node_modules from image, avoid overwriting
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+      # Use polling so file changes on host are detected in the container
+      - CHOKIDAR_USEPOLLING=true
