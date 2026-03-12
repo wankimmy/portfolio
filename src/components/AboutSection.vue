@@ -1,64 +1,43 @@
-<!-- 
-  About Me Section Component
-  
-  Displays personal introduction, profile image, and personality traits.
-  Uses Tailwind CSS for styling and responsive design.
-  
-  @component
-  @features
-    - Profile image display
-    - Personal introduction text
-    - Personality trait cards
-    - Responsive grid layout
--->
 <template>
-  <section id="about" class="min-h-screen py-20 px-4 sm:px-6 md:px-8 bg-gradient-to-b from-[#050510] via-slate-900/50 to-[#050510] relative">
-    <!-- Glow orbs -->
-    <div class="glow-orb absolute w-72 h-72 bg-cyan-500/8 rounded-full blur-3xl top-20 -left-20"></div>
-    <div class="glow-orb absolute w-96 h-96 bg-indigo-500/6 rounded-full blur-3xl bottom-10 -right-20"></div>
-
+  <section id="about" class="relative py-20 px-4 sm:px-6 md:px-8">
     <div class="max-w-7xl mx-auto relative z-10">
       <div class="section-heading text-center mb-16">
-        <h2 class="section-title text-5xl md:text-6xl font-extrabold mb-4 bg-gradient-to-r from-cyan-400 via-primary to-secondary bg-clip-text text-transparent">
+        <h2 class="section-title text-5xl md:text-6xl font-extrabold mb-4" style="text-shadow: 0 2px 10px rgba(0,0,0,0.3);">
           About Me
         </h2>
-        <p class="section-subtitle text-xl text-slate-400 font-medium">Get to know the astronaut</p>
+        <p class="section-subtitle text-xl text-cream/80 font-medium">Get to know the captain behind the code</p>
       </div>
 
-      <div class="grid md:grid-cols-2 gap-20 items-center">
+      <div class="grid md:grid-cols-2 gap-16 items-center">
         <div class="about-image flex justify-center">
-          <div class="w-96 h-96 md:w-[28rem] md:h-[28rem] rounded-3xl overflow-hidden transform hover:scale-105 transition-transform duration-300 shadow-2xl shadow-cyan-500/10">
-            <img
-              src="/assets/profile.png"
-              alt="Safwan Hakim"
-              class="w-full h-full object-cover"
-            />
+          <div class="w-80 h-80 md:w-[26rem] md:h-[26rem] rounded-3xl overflow-hidden transform hover:scale-105 transition-transform duration-300 shadow-2xl ring-2 ring-white/10">
+            <img src="/assets/profile.png" alt="Safwan Hakim" class="w-full h-full object-cover" />
           </div>
         </div>
 
         <div class="about-text">
-          <h3 class="text-4xl font-bold text-white mb-6">Hi, I'm SAFWAN HAKIM</h3>
-          <p class="text-lg text-slate-300 leading-relaxed mb-10 font-medium">
-            With 8 years of experience in the software engineering industry, I am eager to embrace new challenges within
-            forward-thinking and customer-focused organizations. Leveraging my profound love for technology and
-            extensive knowledge of software engineering, I aim to contribute significantly to the team. My enthusiasm for
-            continuous learning, especially in the realm of the Internet of Things, drives me to innovate and develop
-            technologies that benefit our community. I specialize in modern web technologies including Laravel, Vue.js, Node.js,
-            and cloud platforms like AWS, while also leading teams and mentoring junior developers.
+          <h3 class="text-4xl font-bold text-cream mb-6" style="text-shadow: 0 1px 6px rgba(0,0,0,0.2);">
+            Hi, I'm <span class="text-secondary">SAFWAN HAKIM</span>
+          </h3>
+          <p class="text-lg text-cream/80 leading-relaxed mb-10 font-medium">
+            I navigate the Grand Line of software engineering the way a captain steers through uncharted waters:
+            stay calm in rough seas, read the map with care, and keep the crew moving forward. Across 8 years,
+            I've shipped products with Laravel, Vue.js, Node.js, AWS, and IoT tools while mentoring developers,
+            reviewing code, and helping teams deliver with confidence.
           </p>
 
-          <div class="grid grid-cols-3 gap-6">
-            <div class="trait-card bg-slate-800/80 backdrop-blur border border-slate-600/50 p-6 rounded-2xl shadow-xl text-center text-white transform hover:scale-110 transition-transform duration-300 hover:border-cyan-400/50 hover:shadow-cyan-500/20">
-              <div class="text-6xl mb-3">🐱</div>
-              <p class="text-cyan-100 text-sm font-semibold">Curious Cat</p>
+          <div class="grid grid-cols-3 gap-5">
+            <div class="trait-card sea-card p-5 rounded-2xl text-center transform hover:scale-110 transition-transform duration-300">
+              <div class="text-5xl mb-3">🧭</div>
+              <p class="text-cream text-sm font-bold">Navigator</p>
             </div>
-            <div class="trait-card bg-slate-800/80 backdrop-blur border border-primary/40 p-6 rounded-2xl shadow-xl text-center text-white transform hover:scale-110 transition-transform duration-300 hover:border-primary/60 hover:shadow-indigo-500/20">
-              <div class="text-6xl mb-3">🔧</div>
-              <p class="text-slate-200 text-sm font-semibold">Problem Solver</p>
+            <div class="trait-card sea-card p-5 rounded-2xl text-center transform hover:scale-110 transition-transform duration-300">
+              <div class="text-5xl mb-3">⚓</div>
+              <p class="text-cream text-sm font-bold">Builder</p>
             </div>
-            <div class="trait-card bg-slate-800/80 backdrop-blur border border-secondary/40 p-6 rounded-2xl shadow-xl text-center text-white transform hover:scale-110 transition-transform duration-300 hover:border-secondary/60 hover:shadow-violet-500/20">
-              <div class="text-6xl mb-3">🤔</div>
-              <p class="text-slate-200 text-sm font-semibold">Skeptical Thinker</p>
+            <div class="trait-card sea-card p-5 rounded-2xl text-center transform hover:scale-110 transition-transform duration-300">
+              <div class="text-5xl mb-3">🏴‍☠️</div>
+              <p class="text-cream text-sm font-bold">Captain</p>
             </div>
           </div>
         </div>
@@ -68,6 +47,4 @@
 </template>
 
 <script setup>
-// About Section - Personal introduction and traits display
-// No animations needed for this section
 </script>

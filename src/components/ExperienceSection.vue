@@ -1,30 +1,26 @@
 <template>
-  <section id="experience" class="min-h-screen py-20 px-8 bg-gradient-to-b from-[#050510] via-slate-900/50 to-[#050510] relative">
-    <!-- Glow orbs -->
-    <div class="glow-orb absolute w-80 h-80 bg-indigo-500/6 rounded-full blur-3xl top-40 -right-32"></div>
-    <div class="glow-orb absolute w-64 h-64 bg-cyan-500/8 rounded-full blur-3xl bottom-20 -left-20"></div>
-
+  <section id="experience" class="relative py-20 px-8">
     <div class="max-w-5xl mx-auto relative z-10">
       <div class="section-heading text-center mb-16">
-        <h2 class="section-title text-5xl md:text-6xl font-extrabold mb-4 bg-gradient-to-r from-cyan-400 via-primary to-secondary bg-clip-text text-transparent">
-          Experience
+        <h2 class="section-title text-5xl md:text-6xl font-extrabold mb-4" style="text-shadow: 0 2px 10px rgba(0,0,0,0.3);">
+          Voyage Log
         </h2>
-        <p class="section-subtitle text-xl text-slate-400 font-medium">Mission log — software engineering journey</p>
+        <p class="section-subtitle text-xl text-cream/80 font-medium">Every major arc in my engineering adventure</p>
       </div>
 
       <div class="relative">
-        <div class="timeline-line hidden md:block absolute left-1/2 top-0 bottom-0 w-1 bg-gradient-to-b from-cyan-500/50 via-primary/50 to-secondary/50 transform -translate-x-1/2"></div>
+        <div class="timeline-line hidden md:block absolute left-1/2 top-0 bottom-0 w-1 bg-gradient-to-b from-secondary/60 via-white/30 to-primary/50 transform -translate-x-1/2 rounded-full"></div>
 
         <div v-for="(job, index) in experience" :key="index" class="exp-card relative mb-16 pl-0 md:pl-1/2 md:ml-24">
-          <div class="timeline-dot hidden md:flex absolute left-1/2 top-0 w-6 h-6 rounded-full bg-gradient-to-r from-cyan-400 to-primary border-4 border-slate-900 shadow-xl shadow-cyan-500/30 -ml-3 transform -translate-x-1/2"></div>
+          <div class="timeline-dot hidden md:flex absolute left-1/2 top-0 w-7 h-7 rounded-full bg-gradient-to-r from-secondary to-primary border-4 border-ocean-900 shadow-lg shadow-secondary/30 -ml-3.5 transform -translate-x-1/2"></div>
 
-          <div class="bg-slate-800/70 backdrop-blur p-10 rounded-3xl shadow-xl md:ml-0 ml-0 hover:shadow-2xl hover:shadow-cyan-500/10 transition-all duration-300 hover:scale-[1.02] border border-cyan-500/20 hover:border-cyan-400/40">
-            <div class="text-cyan-400 font-bold text-lg mb-3">{{ job.period }}</div>
-            <h3 class="text-3xl font-bold text-white mb-2">{{ job.title }}</h3>
-            <p class="text-primary font-bold text-lg mb-6">{{ job.company }}</p>
+          <div class="sea-card p-8 md:p-10 rounded-3xl md:ml-0 ml-0 hover:scale-[1.02] transition-all duration-300">
+            <div class="text-secondary font-extrabold text-lg mb-2">{{ job.period }}</div>
+            <h3 class="text-2xl md:text-3xl font-bold text-cream mb-1">{{ job.title }}</h3>
+            <p class="text-secondary/80 font-bold text-lg mb-5">{{ job.company }}</p>
             <ul class="list-none space-y-3">
-              <li v-for="duty in job.duties" :key="duty" class="flex items-start gap-3 text-slate-300">
-                <span class="text-cyan-400 font-bold text-xl flex-shrink-0">&#10003;</span>
+              <li v-for="duty in job.duties" :key="duty" class="flex items-start gap-3 text-cream/75">
+                <span class="text-secondary font-bold text-xl flex-shrink-0 mt-0.5">✦</span>
                 <span class="font-medium">{{ duty }}</span>
               </li>
             </ul>
@@ -36,7 +32,6 @@
 </template>
 
 <script setup>
-// Professional experience data
 const experience = [
   {
     period: 'April 2020 - Present',

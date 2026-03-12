@@ -1,21 +1,11 @@
-/**
- * Global Styles & Animations
- * 
- * Contains:
- * - CSS Reset
- * - Global typography (Inter font)
- * - Smooth scroll behavior
- * - Scrollbar hidden
- * 
- * @file style.css
- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Pirata+One&display=swap');
 
-/* Import Inter font from Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-
-/* ============================================
-   CSS RESET
-   ============================================ */
+:root {
+  --ocean-light: #016FB7;
+  --ocean-dark: #003280;
+  --sky: #92BFE7;
+  --cream: #F4EBDF;
+}
 
 * {
   margin: 0;
@@ -23,11 +13,6 @@
   box-sizing: border-box;
 }
 
-/* ============================================
-   BASE STYLES
-   ============================================ */
-
-/* Smooth scrolling; scrollbar hidden everywhere */
 html,
 body {
   scroll-behavior: smooth;
@@ -41,52 +26,41 @@ body::-webkit-scrollbar,
   display: none;
 }
 
-/* Body typography and base styles (space theme) */
 body {
   font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #050510;
-  color: #e2e8f0;
+  background: linear-gradient(180deg, var(--ocean-light) 0%, var(--ocean-dark) 100%);
+  background-attachment: fixed;
+  color: #ffffff;
 }
 
-/* App container */
 #app {
   width: 100%;
   min-height: 100vh;
 }
 
-/* ============================================
-   INTERACTIVE ELEMENTS
-   ============================================ */
-
-/* Smooth transitions for all interactive elements */
 a, button {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ============================================
-   SECTION DIVIDERS
-   ============================================ */
-
-section + section {
-  border-top: 1px solid rgba(56, 189, 248, 0.06);
+::selection {
+  background: rgba(245, 197, 24, 0.5);
+  color: #fff;
 }
 
-/* ============================================
-   GLOW ORB BASE
-   ============================================ */
-
-.glow-orb {
-  pointer-events: none;
-  will-change: transform;
+.section-title {
+  font-family: 'Pirata One', serif;
+  letter-spacing: 0.03em;
+  color: var(--cream);
 }
 
-/* ============================================
-   ANIMATION INITIAL STATES
-   Prevent flash-of-unstyled-content before GSAP runs
-   ============================================ */
+.hero-title,
+.nav-brand {
+  font-family: 'Pirata One', serif;
+  letter-spacing: 0.04em;
+}
 
 .hero-badge,
 .hero-title,
@@ -97,11 +71,185 @@ section + section {
   opacity: 0;
 }
 
+.glow-orb {
+  pointer-events: none;
+  will-change: transform;
+}
+
 /* ============================================
-   SELECTION STYLING
+   CLOUD ANIMATIONS
    ============================================ */
 
-::selection {
-  background: rgba(56, 189, 248, 0.3);
-  color: #fff;
+.cloud {
+  position: absolute;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(244, 250, 255, 0.92) 48%, rgba(212, 232, 247, 0.86) 100%);
+  border-radius: 9999px;
+  opacity: 0.9;
+  filter: blur(1.5px);
+  pointer-events: none;
+  box-shadow:
+    0 18px 40px rgba(103, 149, 189, 0.16),
+    inset 0 8px 18px rgba(255, 255, 255, 0.5),
+    inset 0 -10px 18px rgba(168, 201, 226, 0.2);
+}
+
+.cloud::before,
+.cloud::after {
+  content: '';
+  position: absolute;
+  background: inherit;
+  border-radius: 9999px;
+}
+
+.cloud::before {
+  width: 54%;
+  height: 120%;
+  top: -58%;
+  left: 16%;
+}
+
+.cloud::after {
+  width: 42%;
+  height: 88%;
+  top: -24%;
+  left: 56%;
+}
+
+.cloud-1 {
+  width: 240px;
+  height: 62px;
+  top: 8%;
+  animation: cloudDrift 68s linear infinite;
+}
+
+.cloud-2 {
+  width: 190px;
+  height: 48px;
+  top: 17%;
+  animation: cloudDrift 84s linear infinite;
+  animation-delay: -18s;
+  opacity: 0.72;
+}
+
+.cloud-3 {
+  width: 310px;
+  height: 74px;
+  top: 5%;
+  animation: cloudDrift 96s linear infinite;
+  animation-delay: -36s;
+  opacity: 0.58;
+}
+
+.cloud-4 {
+  width: 165px;
+  height: 40px;
+  top: 25%;
+  animation: cloudDrift 78s linear infinite;
+  animation-delay: -8s;
+  opacity: 0.48;
+}
+
+.cloud-5 {
+  width: 280px;
+  height: 68px;
+  top: 11%;
+  animation: cloudDrift 108s linear infinite;
+  animation-delay: -54s;
+  opacity: 0.42;
+}
+
+.cloud-6 {
+  width: 220px;
+  height: 54px;
+  top: 30%;
+  animation: cloudDrift 88s linear infinite;
+  animation-delay: -28s;
+  opacity: 0.34;
+}
+
+.cloud-7 {
+  width: 360px;
+  height: 82px;
+  top: 2%;
+  animation: cloudDrift 124s linear infinite;
+  animation-delay: -68s;
+  opacity: 0.3;
+}
+
+@keyframes cloudDrift {
+  0% { transform: translateX(-300px); }
+  100% { transform: translateX(calc(100vw + 300px)); }
+}
+
+/* ============================================
+   ANIME WAVE DIVIDER
+   ============================================ */
+
+.anime-wave {
+  position: relative;
+  width: 100%;
+  height: 100px;
+  overflow: hidden;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.anime-wave svg {
+  position: absolute;
+  bottom: 0;
+  width: 200%;
+  height: 100%;
+  min-width: 1400px;
+}
+
+.anime-wave .wave-back {
+  animation: waveSlide 8s linear infinite;
+  opacity: 0.4;
+}
+
+.anime-wave .wave-mid {
+  animation: waveSlide 6s linear infinite reverse;
+  opacity: 0.6;
+}
+
+.anime-wave .wave-front {
+  animation: waveSlide 4s linear infinite;
+  opacity: 0.85;
+}
+
+@keyframes waveSlide {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ============================================
+   GLASS SEA CARD
+   ============================================ */
+
+.sea-card {
+  background: rgba(1, 111, 183, 0.25);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(146, 191, 231, 0.2);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.sea-card:hover {
+  background: rgba(0, 50, 128, 0.4);
+  border-color: rgba(245, 197, 24, 0.35);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.parchment-card {
+  background: rgba(1, 111, 183, 0.25);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(146, 191, 231, 0.2);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.parchment-card:hover {
+  background: rgba(0, 50, 128, 0.4);
+  border-color: rgba(245, 197, 24, 0.35);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
