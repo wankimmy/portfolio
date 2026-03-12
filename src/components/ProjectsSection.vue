@@ -1,18 +1,22 @@
 <template>
   <section id="projects" class="min-h-screen py-20 px-8 bg-gradient-to-b from-[#050510] via-slate-900/40 to-[#050510] relative">
+    <!-- Glow orbs -->
+    <div class="glow-orb absolute w-96 h-96 bg-cyan-500/6 rounded-full blur-3xl top-32 -left-24"></div>
+    <div class="glow-orb absolute w-72 h-72 bg-violet-500/6 rounded-full blur-3xl bottom-20 -right-16"></div>
+
     <div class="max-w-7xl mx-auto relative z-10">
-      <div class="text-center mb-16">
-        <h2 class="text-5xl md:text-6xl font-extrabold mb-4 bg-gradient-to-r from-cyan-400 via-primary to-secondary bg-clip-text text-transparent">
+      <div class="section-heading text-center mb-16">
+        <h2 class="section-title text-5xl md:text-6xl font-extrabold mb-4 bg-gradient-to-r from-cyan-400 via-primary to-secondary bg-clip-text text-transparent">
           Featured Projects
         </h2>
-        <p class="text-xl text-slate-400 font-medium">Launch history — recent missions</p>
+        <p class="section-subtitle text-xl text-slate-400 font-medium">Launch history — recent missions</p>
       </div>
-      
+
       <div class="grid md:grid-cols-2 lg:grid-cols-2 gap-10">
-        <div 
-          v-for="project in projects" 
-          :key="project.id" 
-          class="bg-slate-800/70 backdrop-blur rounded-3xl overflow-hidden shadow-2xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 group border border-cyan-500/20 hover:border-cyan-400/40"
+        <div
+          v-for="project in projects"
+          :key="project.id"
+          class="project-card bg-slate-800/70 backdrop-blur rounded-3xl overflow-hidden shadow-2xl hover:shadow-2xl hover:shadow-cyan-500/10 transition-all duration-300 transform hover:-translate-y-2 group border border-cyan-500/20 hover:border-cyan-400/40"
         >
           <div class="relative h-72 overflow-hidden bg-gradient-to-br from-slate-700/80 to-slate-800/80">
             <div class="absolute inset-0 flex items-center justify-center text-7xl">

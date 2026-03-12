@@ -1,11 +1,15 @@
 <template>
   <section id="tech" class="min-h-screen py-10 sm:py-14 md:py-20 px-4 sm:px-6 md:px-8 bg-gradient-to-b from-[#050510] via-slate-900/40 to-[#050510] relative">
+    <!-- Glow orbs -->
+    <div class="glow-orb absolute w-72 h-72 bg-cyan-500/8 rounded-full blur-3xl top-10 -right-20"></div>
+    <div class="glow-orb absolute w-80 h-80 bg-violet-500/6 rounded-full blur-3xl bottom-10 -left-24"></div>
+
     <div class="max-w-7xl mx-auto relative z-10">
-      <div class="text-center mb-8 sm:mb-12 md:mb-16">
-        <h2 class="text-5xl md:text-6xl font-extrabold mb-4 bg-gradient-to-r from-cyan-400 via-primary to-secondary bg-clip-text text-transparent">
+      <div class="section-heading text-center mb-8 sm:mb-12 md:mb-16">
+        <h2 class="section-title text-5xl md:text-6xl font-extrabold mb-4 bg-gradient-to-r from-cyan-400 via-primary to-secondary bg-clip-text text-transparent">
           Technologies
         </h2>
-        <p class="text-xl text-slate-400 font-medium">Tech stack for the mission</p>
+        <p class="section-subtitle text-xl text-slate-400 font-medium">Tech stack for the mission</p>
       </div>
       
       <div class="bg-slate-800/60 backdrop-blur-sm p-4 sm:p-6 lg:p-10 rounded-3xl shadow-2xl border border-cyan-500/20">

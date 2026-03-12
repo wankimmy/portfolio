@@ -65,3 +65,43 @@ body {
 a, button {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* ============================================
+   SECTION DIVIDERS
+   ============================================ */
+
+section + section {
+  border-top: 1px solid rgba(56, 189, 248, 0.06);
+}
+
+/* ============================================
+   GLOW ORB BASE
+   ============================================ */
+
+.glow-orb {
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* ============================================
+   ANIMATION INITIAL STATES
+   Prevent flash-of-unstyled-content before GSAP runs
+   ============================================ */
+
+.hero-badge,
+.hero-title,
+.hero-subtitle,
+.hero-desc,
+.hero-cta,
+.hero-social {
+  opacity: 0;
+}
+
+/* ============================================
+   SELECTION STYLING
+   ============================================ */
+
+::selection {
+  background: rgba(56, 189, 248, 0.3);
+  color: #fff;
+}

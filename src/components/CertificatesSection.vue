@@ -11,19 +11,23 @@
 -->
 <template>
   <section id="certificates" class="min-h-screen py-20 px-8 bg-gradient-to-b from-[#050510] via-slate-900/50 to-[#050510] relative">
+    <!-- Glow orbs -->
+    <div class="glow-orb absolute w-80 h-80 bg-indigo-500/6 rounded-full blur-3xl top-20 -right-24"></div>
+    <div class="glow-orb absolute w-64 h-64 bg-cyan-500/8 rounded-full blur-3xl bottom-32 -left-16"></div>
+
     <div class="max-w-7xl mx-auto relative z-10">
-      <div class="text-center mb-16">
-        <h2 class="text-5xl md:text-6xl font-extrabold mb-4 bg-gradient-to-r from-cyan-400 via-primary to-secondary bg-clip-text text-transparent">
+      <div class="section-heading text-center mb-16">
+        <h2 class="section-title text-5xl md:text-6xl font-extrabold mb-4 bg-gradient-to-r from-cyan-400 via-primary to-secondary bg-clip-text text-transparent">
           Professional Certifications
         </h2>
-        <p class="text-xl text-slate-400 font-medium">Credentials from the mission</p>
+        <p class="section-subtitle text-xl text-slate-400 font-medium">Credentials from the mission</p>
       </div>
-      
+
       <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-        <div 
-          v-for="cert in certificates" 
-          :key="cert.id" 
-          class="bg-slate-800/70 backdrop-blur rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-cyan-500/20 hover:border-cyan-400/40 group"
+        <div
+          v-for="cert in certificates"
+          :key="cert.id"
+          class="cert-card bg-slate-800/70 backdrop-blur rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl hover:shadow-cyan-500/10 transition-all duration-300 transform hover:-translate-y-2 border border-cyan-500/20 hover:border-cyan-400/40 group"
         >
           <div class="relative h-64 bg-gradient-to-br from-cyan-900/80 via-slate-800 to-primary/80 flex items-center justify-center">
             <div class="absolute inset-0 flex items-center justify-center text-8xl opacity-20">
