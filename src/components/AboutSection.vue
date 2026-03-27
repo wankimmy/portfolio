@@ -1,49 +1,55 @@
 <template>
   <section id="about" class="section section--panel">
     <div class="section__inner">
-      <div class="section-heading reveal">
-        <p class="section-kicker">The Architectural Philosophy</p>
-        <h2 class="section-title">I build calm around complex systems.</h2>
-      </div>
+      <div class="about-layout reveal">
+        <p class="section-kicker about-layout__kicker">About me</p>
 
-      <div class="about-layout">
-        <article class="about-copy reveal">
+        <h2 class="section-title about-layout__title">
+          I like building products that is useful for the community.
+        </h2>
+
+        <article class="about-copy about-layout__copy">
           <p>
-            I do not treat software as a collection of tickets. I treat it as an operating system for
-            a business: architecture, delivery rituals, product tradeoffs, and human momentum all
-            have to fit together.
+            I do not just write code. I think about the full product: the design, the flow, the
+            system behind it, how people use it and how you want to sell it.
           </p>
           <p>
-            Over the last eight years I’ve moved from hands-on implementation into leadership,
-            helping teams ship reliable products, coordinate high-pressure releases, and stay aligned
-            across stakeholders without losing engineering quality.
+            Over the years, I have worked as a software engineer and a manager. I still like solving real
+            problems and keeping things done.
           </p>
-
-          <div class="about-quote">
-            <span>North star</span>
-            <strong>Clear systems, evidence-based decisions, and teams that can keep shipping.</strong>
-          </div>
         </article>
 
-        <aside class="about-profile reveal">
-          <div class="about-profile__media">
-            <img src="/assets/profile.png" alt="Portrait of Safwan Hakim" loading="lazy" />
+        <figure class="about-profile about-layout__photo">
+          <div class="about-profile__media about-profile__media--portrait">
+            <img
+              src="/images/safwan-potrait.png"
+              alt="Portrait of Safwan Hakim"
+              width="800"
+              height="1200"
+              loading="lazy"
+              decoding="async"
+            />
           </div>
+        </figure>
 
-          <div class="about-profile__card">
-            <p class="section-kicker">Focus areas</p>
+        <aside class="about-stack about-layout__aside">
+          <div class="about-card tilt-card">
+            <div class="about-card__header">
+              <p class="about-card__eyebrow">How I work</p>
+            </div>
+
             <div class="about-values">
               <div class="about-value">
-                <strong>Lead</strong>
-                <span>Engineering teams with accountability and empathy</span>
+                <strong>Keep it simple</strong>
+                <span>Simple is better than complex.</span>
               </div>
               <div class="about-value">
-                <strong>Architect</strong>
-                <span>Reliable platforms across commerce, fintech, and operations</span>
+                <strong>Keep it nice</strong>
+                <span>Beautiful design and smooth user experience.</span>
               </div>
               <div class="about-value">
-                <strong>Ship</strong>
-                <span>Delivery practices that keep quality high under pressure</span>
+                <strong>Keep it useful</strong>
+                <span>Every feature should help the user, not add noise.</span>
               </div>
             </div>
           </div>

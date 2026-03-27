@@ -1,174 +1,368 @@
 <template>
-  <div ref="containerRef" class="earth-container cursor-grab active:cursor-grabbing">
-    <!-- Canvas mounted here -->
-  </div>
+  <div
+    ref="containerRef"
+    class="earth-container"
+    role="application"
+    aria-label="Interactive 3D Earth — spins slowly; drag to rotate"
+    tabindex="0"
+  ></div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import * as THREE from 'three'
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-
-/**
- * Earth3D - Centred, interactive Earth (inspired by threejs.org/examples webgpu_tsl_earth).
- * Drag to spin the earth; WebGL + OrbitControls. Bigger, brighter, mobile responsive.
- */
+import { onMounted, onUnmounted, ref } from 'vue'
+import * as THREE from 'three/webgpu'
+import {
+  bumpMap,
+  cameraPosition,
+  color,
+  max,
+  mix,
+  normalWorld,
+  output,
+  positionWorld,
+  step,
+  texture,
+  uniform,
+  uv,
+  vec3,
+  vec4,
+} from 'three/webgpu'
 
 const containerRef = ref(null)
-let scene = null
-let camera = null
-let renderer = null
-let earth = null
-let atmosphere = null
-let controls = null
-let frameId = null
 
-const EARTH_TEXTURE =
-  'https://cdn.apewebapps.com/threejs/160/examples/textures/planets/earth_atmos_2048.jpg'
+const TEXTURE_BASE = '/textures/planets/'
 
-// Start with Japan (~138° E) facing the camera (longitude to radians, negated for texture convention)
-const JAPAN_INITIAL_ROTATION = -(138 * Math.PI) / 180
+let scene
+let camera
+let renderer
+let frameId
+let resizeObserver
+let rootGroup
+let earthMesh
+let atmosphereMesh
+let stars
+let spinGroup
+let clock
+let isDragging = false
+let lastClientX = 0
+let lastClientY = 0
+let loadedTextures = []
 
-const init = () => {
-  if (!containerRef.value) return
-  const width = containerRef.value.clientWidth
-  const height = containerRef.value.clientHeight
-  if (width <= 0 || height <= 0) return
+const DRAG_ROTATE = 0.007
+const MAX_TILT_X = 0.52
+/** Radians per second — slow idle spin when not dragging */
+const AUTO_SPIN_SPEED = 0.09
+
+/** Port of three.js webgpu_tsl_earth (r170): TSL day/night, clouds, atmosphere — adapted for hero layout. */
+const makeStarField = () => {
+  const geometry = new THREE.BufferGeometry()
+  const positions = []
+
+  for (let index = 0; index < 420; index += 1) {
+    const radius = 2.8 + Math.random() * 2.8
+    const theta = Math.random() * Math.PI * 2
+    const phi = Math.acos(2 * Math.random() - 1)
+
+    positions.push(
+      radius * Math.sin(phi) * Math.cos(theta),
+      radius * Math.sin(phi) * Math.sin(theta),
+      radius * Math.cos(phi)
+    )
+  }
+
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+
+  const material = new THREE.PointsMaterial({
+    color: 0xa8d4ff,
+    size: 0.017,
+    transparent: true,
+    opacity: 0.45,
+  })
+
+  stars = new THREE.Points(geometry, material)
+  scene.add(stars)
+}
+
+const buildEarth = (dayTexture, nightTexture, bumpRoughnessCloudsTexture, sunDirection) => {
+  const atmosphereDayColor = uniform(color('#4db2ff'))
+  const atmosphereTwilightColor = uniform(color('#bc490b'))
+  const roughnessLow = uniform(0.25)
+  const roughnessHigh = uniform(0.35)
+
+  const viewDirection = positionWorld.sub(cameraPosition).normalize()
+  const fresnel = viewDirection.dot(normalWorld).abs().oneMinus().toVar()
+
+  const sunOrientation = normalWorld.dot(sunDirection).toVar()
+
+  const atmosphereColor = mix(atmosphereTwilightColor, atmosphereDayColor, sunOrientation.smoothstep(-0.25, 0.75))
+
+  const globeMaterial = new THREE.MeshStandardNodeMaterial()
+
+  const cloudsStrength = texture(bumpRoughnessCloudsTexture, uv()).b.smoothstep(0.2, 1)
+
+  globeMaterial.colorNode = mix(texture(dayTexture), vec3(1), cloudsStrength.mul(2))
+
+  const roughness = max(texture(bumpRoughnessCloudsTexture, uv()).g, step(0.01, cloudsStrength))
+  globeMaterial.roughnessNode = roughness.remap(0, 1, roughnessLow, roughnessHigh)
+
+  const night = texture(nightTexture)
+  const dayStrength = sunOrientation.smoothstep(-0.25, 0.5)
+
+  const atmosphereDayStrength = sunOrientation.smoothstep(-0.5, 1)
+  const atmosphereMix = atmosphereDayStrength.mul(fresnel.pow(2)).clamp(0, 1)
+
+  let finalOutput = mix(night.rgb, output.rgb, dayStrength)
+  finalOutput = mix(finalOutput, atmosphereColor, atmosphereMix)
+
+  globeMaterial.outputNode = vec4(finalOutput, output.a)
+
+  const bumpElevation = max(texture(bumpRoughnessCloudsTexture, uv()).r, cloudsStrength)
+  globeMaterial.normalNode = bumpMap(bumpElevation)
+
+  const sphereGeometry = new THREE.SphereGeometry(1, 64, 64)
+  earthMesh = new THREE.Mesh(sphereGeometry, globeMaterial)
+
+  const atmosphereMaterial = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide, transparent: true })
+  let alpha = fresnel.remap(0.73, 1, 1, 0).pow(3)
+  alpha = alpha.mul(sunOrientation.smoothstep(-0.5, 1))
+  atmosphereMaterial.outputNode = vec4(atmosphereColor, alpha)
+
+  atmosphereMesh = new THREE.Mesh(sphereGeometry, atmosphereMaterial)
+  atmosphereMesh.scale.setScalar(1.04)
+
+  spinGroup = new THREE.Group()
+  spinGroup.add(earthMesh)
+  spinGroup.add(atmosphereMesh)
+
+  rootGroup = new THREE.Group()
+  rootGroup.add(spinGroup)
+  scene.add(rootGroup)
+}
+
+const initScene = async () => {
+  if (!containerRef.value) {
+    return
+  }
+
+  const width = containerRef.value.clientWidth || 420
+  const height = containerRef.value.clientHeight || 420
 
   scene = new THREE.Scene()
-  camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100)
-  camera.position.z = 3.5
+  camera = new THREE.PerspectiveCamera(35, width / height, 0.1, 100)
+  camera.position.set(0, 0.1, 5.05)
 
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-  renderer.setSize(width, height)
+  renderer = new THREE.WebGPURenderer({ antialias: true, alpha: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-  renderer.setClearColor(0x000000, 0)
+  renderer.setSize(width, height)
+  renderer.outputColorSpace = THREE.SRGBColorSpace
+  renderer.toneMapping = THREE.ACESFilmicToneMapping
+  renderer.toneMappingExposure = 1
+
+  await renderer.init()
+
   containerRef.value.appendChild(renderer.domElement)
 
-  const loader = new THREE.TextureLoader()
-  loader.load(
-    EARTH_TEXTURE,
-    (map) => {
-      map.colorSpace = THREE.SRGBColorSpace
-      const geometry = new THREE.SphereGeometry(1, 64, 64)
-      const material = new THREE.MeshPhongMaterial({
-        map,
-        specularMap: null,
-        shininess: 0,
-        specular: new THREE.Color(0x000000),
-        emissive: new THREE.Color(0x051525),
-        color: new THREE.Color(0xffffff),
-      })
-      earth = new THREE.Mesh(geometry, material)
-      earth.rotation.y = JAPAN_INITIAL_ROTATION
-      scene.add(earth)
-    },
-    undefined,
-    () => {
-      const geometry = new THREE.SphereGeometry(1, 32, 32)
-      const material = new THREE.MeshPhongMaterial({
-        color: 0x87ceeb,
-        emissive: 0x204060,
-        specular: 0x000000,
-        shininess: 0,
-      })
-      earth = new THREE.Mesh(geometry, material)
-      earth.rotation.y = JAPAN_INITIAL_ROTATION
-      scene.add(earth)
-    }
-  )
+  const sun = new THREE.DirectionalLight('#ffffff', 2.2)
+  sun.position.set(2.4, 0.6, 3.2)
+  scene.add(sun)
 
-  const atmosphereGeometry = new THREE.SphereGeometry(1.018, 64, 64)
-  const atmosphereMaterial = new THREE.MeshPhongMaterial({
-    color: 0xadd8e6,
-    emissive: 0x307090,
-    transparent: true,
-    opacity: 0.26,
-    side: THREE.BackSide,
-    shininess: 0,
-    specular: 0x000000,
+  scene.add(new THREE.AmbientLight(0x8cb4d4, 0.22))
+
+  const sunDirection = sun.position.clone().normalize()
+
+  const textureLoader = new THREE.TextureLoader()
+
+  const loadTex = (url) =>
+    new Promise((resolve, reject) => {
+      textureLoader.load(
+        url,
+        (tex) => {
+          loadedTextures.push(tex)
+          resolve(tex)
+        },
+        undefined,
+        reject
+      )
+    })
+
+  const dayTexture = await loadTex(`${TEXTURE_BASE}earth_day_4096.jpg`)
+  dayTexture.colorSpace = THREE.SRGBColorSpace
+  dayTexture.anisotropy = Math.min(8, renderer.getMaxAnisotropy?.() ?? 8)
+
+  const nightTexture = await loadTex(`${TEXTURE_BASE}earth_night_4096.jpg`)
+  nightTexture.colorSpace = THREE.SRGBColorSpace
+  nightTexture.anisotropy = Math.min(8, renderer.getMaxAnisotropy?.() ?? 8)
+
+  const bumpRoughnessCloudsTexture = await loadTex(`${TEXTURE_BASE}earth_bump_roughness_clouds_4096.jpg`)
+  bumpRoughnessCloudsTexture.anisotropy = Math.min(8, renderer.getMaxAnisotropy?.() ?? 8)
+
+  const sunDirUniform = uniform(sunDirection)
+
+  buildEarth(dayTexture, nightTexture, bumpRoughnessCloudsTexture, sunDirUniform)
+
+  makeStarField()
+
+  clock = new THREE.Clock()
+
+  resizeObserver = new ResizeObserver(() => {
+    resize()
   })
-  atmosphere = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial)
-  atmosphere.rotation.y = JAPAN_INITIAL_ROTATION
-  scene.add(atmosphere)
-
-  const ambient = new THREE.AmbientLight(0xadd8e6, 0.85)
-  scene.add(ambient)
-  const dirLight = new THREE.DirectionalLight(0xd4edf7, 1.9)
-  dirLight.position.set(5, 3, 5)
-  scene.add(dirLight)
-  const fillLight = new THREE.DirectionalLight(0xb8e4f0, 0.7)
-  fillLight.position.set(-3, 2, 3)
-  scene.add(fillLight)
-  const rimLight = new THREE.DirectionalLight(0x87ceeb, 0.6)
-  rimLight.position.set(-5, -2, -5)
-  scene.add(rimLight)
-  const topLight = new THREE.DirectionalLight(0xc8e6f5, 0.4)
-  topLight.position.set(0, 5, 2)
-  scene.add(topLight)
-
-  controls = new OrbitControls(camera, renderer.domElement)
-  controls.target.set(0, 0, 0)
-  controls.enableZoom = false
-  controls.enablePan = false
-  controls.enableDamping = true
-  controls.dampingFactor = 0.05
-  controls.rotateSpeed = 0.8
-
-  animate()
+  resizeObserver.observe(containerRef.value)
 }
 
 const animate = () => {
   frameId = requestAnimationFrame(animate)
-  if (!scene || !camera || !renderer) return
-  if (controls) controls.update()
-  if (earth) earth.rotation.y += 0.0008
-  if (atmosphere) atmosphere.rotation.y += 0.0008
+
+  if (!scene || !camera || !renderer || !rootGroup || !spinGroup || !clock) {
+    return
+  }
+
+  const delta = clock.getDelta()
+  if (!isDragging) {
+    spinGroup.rotation.y += delta * AUTO_SPIN_SPEED
+  }
+
+  if (stars) {
+    stars.rotation.y += 0.00022
+    stars.rotation.x += 0.00009
+  }
+
   renderer.render(scene, camera)
 }
 
 const resize = () => {
-  if (!containerRef.value || !camera || !renderer) return
-  const w = containerRef.value.clientWidth
-  const h = containerRef.value.clientHeight
-  camera.aspect = w / h
+  if (!containerRef.value || !camera || !renderer) {
+    return
+  }
+
+  const width = containerRef.value.clientWidth || 420
+  const height = containerRef.value.clientHeight || 420
+
+  camera.aspect = width / height
   camera.updateProjectionMatrix()
-  renderer.setSize(w, h)
+  renderer.setSize(width, height)
+}
+
+const handlePointerDown = (event) => {
+  if (event.button !== 0) {
+    return
+  }
+  isDragging = true
+  lastClientX = event.clientX
+  lastClientY = event.clientY
+  containerRef.value?.setPointerCapture(event.pointerId)
+}
+
+const handlePointerMove = (event) => {
+  if (!containerRef.value || !spinGroup) {
+    return
+  }
+
+  if (isDragging) {
+    const dx = event.clientX - lastClientX
+    const dy = event.clientY - lastClientY
+    lastClientX = event.clientX
+    lastClientY = event.clientY
+
+    spinGroup.rotation.y += dx * DRAG_ROTATE
+    spinGroup.rotation.x += dy * DRAG_ROTATE
+    spinGroup.rotation.x = THREE.MathUtils.clamp(spinGroup.rotation.x, -MAX_TILT_X, MAX_TILT_X)
+  }
+}
+
+const endDrag = (event) => {
+  if (!isDragging) {
+    return
+  }
+  isDragging = false
+  try {
+    containerRef.value?.releasePointerCapture(event.pointerId)
+  } catch {
+    /* already released */
+  }
+}
+
+const handlePointerUp = (event) => {
+  endDrag(event)
+}
+
+const handlePointerCancel = (event) => {
+  endDrag(event)
 }
 
 const cleanup = () => {
-  if (frameId) cancelAnimationFrame(frameId)
-  window.removeEventListener('resize', resize)
-  if (controls) {
-    controls.dispose()
-    controls = null
+  if (frameId) {
+    cancelAnimationFrame(frameId)
   }
-  if (atmosphere) {
-    if (atmosphere.geometry) atmosphere.geometry.dispose()
-    if (atmosphere.material) atmosphere.material.dispose()
-    atmosphere = null
+
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
   }
-  if (earth) {
-    if (earth.geometry) earth.geometry.dispose()
-    if (earth.material) {
-      if (earth.material.map) earth.material.map.dispose()
-      earth.material.dispose()
+
+  if (containerRef.value) {
+    containerRef.value.removeEventListener('pointerdown', handlePointerDown)
+    containerRef.value.removeEventListener('pointermove', handlePointerMove)
+    containerRef.value.removeEventListener('pointerup', handlePointerUp)
+    containerRef.value.removeEventListener('pointercancel', handlePointerCancel)
+  }
+
+  loadedTextures.forEach((tex) => tex.dispose())
+  loadedTextures = []
+
+  if (scene) {
+    scene.traverse((object) => {
+      if (object.geometry) {
+        object.geometry.dispose()
+      }
+
+      if (object.material) {
+        if (Array.isArray(object.material)) {
+          object.material.forEach((material) => material.dispose())
+        } else {
+          object.material.dispose()
+        }
+      }
+    })
+  }
+
+  stars = null
+  rootGroup = null
+  spinGroup = null
+  earthMesh = null
+  atmosphereMesh = null
+  clock = null
+  isDragging = false
+
+  if (renderer) {
+    renderer.dispose()
+
+    if (containerRef.value?.contains(renderer.domElement)) {
+      containerRef.value.removeChild(renderer.domElement)
     }
   }
-  if (renderer && containerRef.value?.contains(renderer.domElement)) {
-    containerRef.value.removeChild(renderer.domElement)
-    renderer.dispose()
-  }
+
   scene = null
   camera = null
   renderer = null
-  earth = null
-  atmosphere = null
 }
 
-onMounted(() => {
-  init()
-  window.addEventListener('resize', resize)
+onMounted(async () => {
+  try {
+    await initScene()
+  } catch (error) {
+    console.error('Earth3D WebGPU init failed:', error)
+    return
+  }
+
+  if (containerRef.value) {
+    containerRef.value.addEventListener('pointerdown', handlePointerDown)
+    containerRef.value.addEventListener('pointermove', handlePointerMove)
+    containerRef.value.addEventListener('pointerup', handlePointerUp)
+    containerRef.value.addEventListener('pointercancel', handlePointerCancel)
+  }
+
+  animate()
 })
 
 onUnmounted(cleanup)
@@ -178,32 +372,37 @@ onUnmounted(cleanup)
 .earth-container {
   position: relative;
   display: block;
+  width: min(580px, 100%);
+  aspect-ratio: 1;
   isolation: isolate;
-  width: min(280px, 88vw);
-  height: min(280px, 88vw);
-  min-height: 200px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.earth-container:active {
+  cursor: grabbing;
+}
+
+.earth-container::before {
+  content: '';
+  position: absolute;
+  inset: 16%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(70, 140, 190, 0.22) 0%,
+    rgba(40, 100, 75, 0.12) 42%,
+    transparent 70%
+  );
+  filter: blur(40px);
+  z-index: 0;
 }
 
 .earth-container canvas {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 100% !important;
   height: 100% !important;
-  position: relative;
-}
-
-@media (min-width: 481px) {
-  .earth-container {
-    width: min(420px, 92vw);
-    height: min(420px, 92vw);
-    min-height: 320px;
-  }
-}
-
-@media (min-width: 769px) {
-  .earth-container {
-    width: min(480px, 42vw);
-    height: min(480px, 42vw);
-    min-height: 360px;
-  }
 }
 </style>

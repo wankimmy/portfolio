@@ -1,43 +1,85 @@
 <template>
-  <section id="home" class="hero">
-    <div class="hero__inner">
-      <div class="hero-scene">
-        <div class="hero-scene__nebula" aria-hidden="true"></div>
-        <div class="hero-scene__stars" aria-hidden="true"></div>
-
-        <div class="hero-orbit">
-          <span class="hero-orbit__planet-ring hero-orbit__planet-ring--one"></span>
-          <span class="hero-orbit__planet-ring hero-orbit__planet-ring--two"></span>
-          <div class="hero-orbit__planet" aria-hidden="true"></div>
-        </div>
-
-        <span class="hero-shape hero-shape--cube hero-shape--left float-card" aria-hidden="true"></span>
-        <span class="hero-shape hero-shape--tetra hero-shape--top float-card" aria-hidden="true"></span>
-        <span class="hero-shape hero-shape--diamond hero-shape--right float-card" aria-hidden="true"></span>
-        <span class="hero-shape hero-shape--planet hero-shape--lower-left float-card" aria-hidden="true"></span>
-        <span class="hero-shape hero-shape--tetra hero-shape--lower-right float-card" aria-hidden="true"></span>
-
-        <div class="hero__copy">
-          <div class="hero__eyebrow">Available for high-stakes architecture</div>
-          <h1 class="hero__title">SAFWAN HAKIM</h1>
-          <p class="hero__role">Associate Software Manager</p>
-          <p class="hero__lead">8+ years experience exploring the digital universe</p>
-
-          <div class="hero__actions">
-            <a class="button button--primary hero__cta" href="#projects">View My Work</a>
-          </div>
-
-          <div class="hero__signals">
-            <a class="hero__signal-pill" href="mailto:putrafyp@gmail.com">Email</a>
-            <a class="hero__signal-pill" href="https://www.linkedin.com/in/safwan-hakim/" target="_blank" rel="noopener">LinkedIn</a>
-            <a class="hero__signal-pill" href="https://github.com/wankimmy" target="_blank" rel="noopener">GitHub</a>
-          </div>
-        </div>
+  <section id="home" ref="heroRoot" class="hero" aria-labelledby="hero-heading">
+    <div class="hero__bg" aria-hidden="true">
+      <div class="hero__galaxy"></div>
+      <div class="hero__starfield">
+        <span
+          v-for="(star, index) in heroStars"
+          :key="index"
+          class="hero__star"
+          :class="{ 'hero__star--twinkle': star.twinkle }"
+          :style="{
+            left: star.left + '%',
+            top: star.top + '%',
+            width: star.size + 'px',
+            height: star.size + 'px',
+            opacity: star.opacity,
+            animationDelay: star.delay + 's',
+          }"
+        />
       </div>
+      <div class="hero__glow"></div>
     </div>
 
-    <a class="scroll-cue" href="#about" aria-label="Scroll down to about section">
-      <span class="scroll-cue__mouse">
+    <div class="hero__planet">
+      <Earth3D class="hero__planet-canvas" />
+    </div>
+
+    <div class="hero__inner">
+      <header class="hero__copy">
+        <p class="hero__greeting">Hi, I'm Safwan Hakim</p>
+        <p class="hero__role">Software manager · Full-stack developer</p>
+
+        <h1 id="hero-heading" class="hero__title">
+          <span class="hero__title-line">I love exploring</span>
+          <span class="hero__title-line hero__title-line--accent">new tech and ideas.</span>
+        </h1>
+
+        <div class="hero__actions">
+          <a class="button button--primary" href="#projects">See work</a>
+          <a class="button button--ghost" href="mailto:putrafyp@gmail.com">Contact me</a>
+        </div>
+
+        <nav class="hero__social" aria-label="Social and contact">
+          <a class="hero__social-link" href="mailto:putrafyp@gmail.com" aria-label="Email">
+            <svg class="hero__social-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path
+                d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"
+              />
+            </svg>
+          </a>
+          <a
+            class="hero__social-link"
+            href="https://www.linkedin.com/in/safwan-hakim/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="LinkedIn"
+          >
+            <svg class="hero__social-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path
+                d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.07 2.07 0 01-2.064-2.063 2.072 2.072 0 114.147 0 2.07 2.07 0 01-2.083 2.063zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"
+              />
+            </svg>
+          </a>
+          <a
+            class="hero__social-link"
+            href="https://github.com/wankimmy"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub"
+          >
+            <svg class="hero__social-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path
+                d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"
+              />
+            </svg>
+          </a>
+        </nav>
+      </header>
+    </div>
+
+    <a class="scroll-cue" href="#about" aria-label="Scroll to about section">
+      <span class="scroll-cue__mouse" aria-hidden="true">
         <span class="scroll-cue__dot"></span>
       </span>
       <span class="scroll-cue__label">Scroll down</span>
@@ -46,22 +88,68 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import gsap from 'gsap'
 
-onMounted(() => {
-  const timeline = gsap.timeline({ delay: 0.15 })
+import Earth3D from './Earth3D.vue'
 
-  timeline
-    .fromTo('.hero-scene', { opacity: 0, scale: 0.96, y: 24 }, { opacity: 1, scale: 1, y: 0, duration: 1, ease: 'power3.out' })
-    .fromTo('.hero-orbit', { opacity: 0, scale: 0.9, y: -20 }, { opacity: 1, scale: 1, y: 0, duration: 1.1, ease: 'power3.out' }, '-=0.65')
-    .fromTo('.hero-shape', { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.7, stagger: 0.08, ease: 'back.out(1.4)' }, '-=0.75')
-    .fromTo('.hero__eyebrow', { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.45, ease: 'power3.out' }, '-=0.5')
-    .fromTo('.hero__title', { opacity: 0, y: 28 }, { opacity: 1, y: 0, duration: 0.85, ease: 'power3.out' }, '-=0.22')
-    .fromTo('.hero__role', { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.55, ease: 'power3.out' }, '-=0.42')
-    .fromTo('.hero__lead', { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.55, ease: 'power3.out' }, '-=0.35')
-    .fromTo('.hero__actions .button', { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }, '-=0.25')
-    .fromTo('.hero__signals a', { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.35, stagger: 0.06, ease: 'power2.out' }, '-=0.15')
-    .fromTo('.scroll-cue', { opacity: 0 }, { opacity: 1, duration: 0.45, ease: 'power2.out' }, '-=0.2')
+const frac = (n) => n - Math.floor(n)
+
+const buildHeroStars = (count) => {
+  const stars = []
+  for (let index = 0; index < count; index += 1) {
+    const r1 = frac(Math.sin(index * 12.9898) * 43758.5453)
+    const r2 = frac(Math.sin(index * 78.233 + 1) * 43758.5453)
+    const r3 = frac(Math.sin(index * 37.719 + 2) * 43758.5453)
+    stars.push({
+      left: r1 * 100,
+      top: r2 * 100,
+      size: r3 > 0.94 ? 2.35 : r3 > 0.72 ? 1.3 : 0.55,
+      opacity: 0.18 + r2 * 0.62,
+      twinkle: r3 > 0.66,
+      delay: r1 * 7,
+    })
+  }
+  return stars
+}
+
+const heroStars = buildHeroStars(340)
+
+const heroRoot = ref(null)
+let ctx
+
+onMounted(() => {
+  const root = heroRoot.value
+  if (!root) return
+
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    return
+  }
+
+  ctx = gsap.context(() => {
+    const timeline = gsap.timeline({ delay: 0.08 })
+
+    timeline
+      .fromTo('.hero__galaxy', { opacity: 0 }, { opacity: 1, duration: 1.35, ease: 'power2.out' })
+      .fromTo('.hero__starfield', { opacity: 0 }, { opacity: 1, duration: 1.2, ease: 'power2.out' }, '-=1.15')
+      .fromTo('.hero__copy', { opacity: 0, y: 32 }, { opacity: 1, y: 0, duration: 0.9, ease: 'power3.out' }, '-=0.95')
+      .fromTo(
+        '.hero__planet',
+        { opacity: 0, scale: 0.94 },
+        { opacity: 1, scale: 1, duration: 1.15, ease: 'power3.out' },
+        '-=0.75'
+      )
+      .fromTo(
+        '.hero__social',
+        { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.45, ease: 'power2.out' },
+        '-=0.55'
+      )
+      .fromTo('.scroll-cue', { opacity: 0 }, { opacity: 1, duration: 0.4, ease: 'power2.out' }, '-=0.35')
+  }, root)
+})
+
+onBeforeUnmount(() => {
+  ctx?.revert()
 })
 </script>
