@@ -1,59 +1,43 @@
-# Agent Profile
+# Agent Profile — Portfolio
 
-Use this file to customize the starter for a specific company, product, or industry after cloning.
-
-This file can be filled in two ways:
-
-- manually by the user or team
-- dynamically by project-understanding after reading the repo, docs, and nearby evidence
-
-When the assistant drafts this file from project understanding:
-
-- prefer confirmed facts from code, docs, copy, manifests, and source-of-truth files
-- mark uncertain items as `Inferred:` or `Unknown`
-- do not invent business details that are not supported by evidence
-- ask the user only when the missing detail materially affects the next task
-
-Suggested drafting rule:
-
-- `Confirmed:` supported directly by repo evidence
-- `Inferred:` likely true based on evidence, naming, or workflow
-- `Unknown:` not yet supported by evidence
+Confirmed: supported directly by repo evidence
+Inferred: likely true based on evidence, naming, or workflow
+Unknown: not yet supported by evidence
 
 ## Identity
 
-- Company or project name: Confirmed: BosskuAI (repo name and README)
-- Product name: Confirmed: BosskuAI — AI cofounder starter kit
-- Industry: Confirmed: AI tooling / developer productivity
-- Business model: Inferred: Open-source starter (MIT License); no monetization layer visible in the repo
-- Stage: Confirmed: Active development (CHANGELOG shows ongoing skill additions); Inferred: pre-commercial / personal or small-team use
+- Owner: Confirmed: Safwan Hakim
+- Project name: Confirmed: portfolio-vue (personal portfolio website)
+- Product: Confirmed: Personal portfolio site showcasing Safwan's professional profile, skills, experience, and projects
+- Industry: Confirmed: Personal branding / professional portfolio
+- Business model: Confirmed: None — personal showcase site, no monetization
+- Stage: Confirmed: Built and functional (README includes production deployment instructions)
 
 ## Audience
 
-- Primary user: Confirmed: Product-building teams who want one AI assistant that covers multiple expert surfaces (product, engineering, security, marketing, sales)
-- Buyer: Inferred: Indie hackers, startup founders, small engineering teams, or solo developers running Claude / Cursor / Codex
-- Secondary users: Inferred: Developers evaluating AI cofounder setups; teams wanting durable, cross-session AI behavior
-- Geography or region: Unknown: No region-specific signals in the repo
+- Primary user: Confirmed: Prospective employers, clients, or collaborators viewing Safwan's professional profile
+- Content: Confirmed: Role (Associate Software Manager), location (Selangor, Malaysia), projects (Festivent, EZDisposal, Entrusol, TTDI Meatpoint), tech stack (24 technologies)
 
 ## Product context
 
-- Core problem: Confirmed: AI tools default to narrow code generators; this starter makes them think like a pragmatic cofounder across product, engineering, security, marketing, and sales
-- Main workflow: Confirmed: Clone → layer into project root → run workspace onboarding prompt → customize agent-profile and project-understanding → use skill-based expert activation per task
-- Key differentiator: Confirmed: 25 expert skills covering all phases (discovery → strategy → build → harden → launch); tool-agnostic (Claude, Cursor, Codex); durable memory system; learning promotion policy
-- Main competitors: Inferred: Generic system prompt templates; Cursor rule bundles; custom GPT instructions; other "AI second brain" or "AI rules" repos — no direct competitors named in the repo
+- Core purpose: Confirmed: Single-page application presenting professional identity, work experience, featured projects, and technology stack
+- Sections: Confirmed: Hero (intro + social links), About (stats + personality), Experience (timeline), Projects (featured work), Technologies (24 tools/frameworks)
+- Projects showcased: Confirmed: Festivent, EZDisposal, Entrusol, TTDI Meatpoint
+- Social links: Confirmed: Email, LinkedIn, GitHub
+- Animations: Confirmed: GSAP-powered scroll animations throughout
 
 ## Operating preferences
 
-- Preferred posture: Confirmed: Plan-first for meaningful tasks; smallest safe change; evidence-before-conclusion; challenge weak assumptions; triple-check important work
-- Risk tolerance: Confirmed: Conservative on security, business logic, and AI workspace trust boundaries; treats security and abuse cases as first-class concerns
-- Product priorities: Confirmed: Evidence-based conclusions; minimal churn; durable memory; skills promoted from repeated patterns; context-limit safety
-- Delivery constraints: Confirmed: Repo must remain tool-agnostic and clone-portable (all internal references relative); no hardcoded paths
-- Brand or tone notes: Confirmed: Pragmatic cofounder voice — concrete tradeoffs over generic advice; no flattery; clarity over vagueness
+- Preferred posture: Minimal changes — this is a personal portfolio, changes should be intentional and reflect Safwan's actual experience
+- Risk tolerance: Low — any visible error directly affects professional impression
+- Deployment: Confirmed: Vite build → copy `dist/` to XAMPP htdocs (local) OR Docker (Dockerfile.dev + nginx.conf)
+- No backend, no API, no auth — pure static frontend
 
-## Research notes
+## Technical context
 
-- Stable market truths worth preserving: Inferred: AI tools are narrowly trained as code generators by default; cofounder-style framing increases output quality for product and business decisions
-- Security or compliance obligations: Confirmed: Agent workspace security is a first-class concern (agent-security-hardening skill, explicit rules against prompt injection, MCP misuse, external content distrust)
-- UX quality bar: Confirmed: Responsive behavior, accessibility basics, and visual fidelity treated as part of quality for UI tasks applied to downstream projects
-- Planning cadence: Inferred: No fixed release cadence observed; CHANGELOG tracks meaningful changes by capability area
-- Marketing channels to prioritize: Unknown: No marketing or distribution signals in the repo
+- Stack: Confirmed: Vue 3 (Composition API), GSAP 3.12, Vite 5, Tailwind CSS (CDN), SVG icons, DevIcons CDN
+- Build: Confirmed: `npm run build` → `dist/` folder
+- Dev: Confirmed: `npm run dev` → localhost:5173
+- Docker: Confirmed: Dockerfile + Dockerfile.dev + nginx.conf + docker-compose.yml for containerized serve
+- Dependencies: Confirmed: `vue ^3.4.0`, `gsap ^3.12.0`, `@vitejs/plugin-vue ^5.0.0`, `vite ^5.0.0`
+- No tests, no backend, no database

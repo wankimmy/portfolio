@@ -22,7 +22,7 @@
     </div>
 
     <div class="hero__planet">
-      <Earth3D class="hero__planet-canvas" />
+      <Earth3D class="hero__planet-canvas" @ready="$emit('earth-ready')" @error="$emit('earth-error')" />
     </div>
 
     <div class="hero__inner">
@@ -92,6 +92,8 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import gsap from 'gsap'
 
 import Earth3D from './Earth3D.vue'
+
+defineEmits(['earth-ready', 'earth-error'])
 
 const frac = (n) => n - Math.floor(n)
 
