@@ -10,6 +10,8 @@
 
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue'
+
+const emit = defineEmits(['ready', 'error'])
 import * as THREE from 'three/webgpu'
 import {
   bumpMap,
@@ -352,6 +354,7 @@ onMounted(async () => {
     await initScene()
   } catch (error) {
     console.error('Earth3D WebGPU init failed:', error)
+    emit('error', error)
     return
   }
 
@@ -363,6 +366,13 @@ onMounted(async () => {
   }
 
   animate()
+
+  // Wait for the next two frames so the first WebGPU frame has been presented.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      emit('ready')
+    })
+  })
 })
 
 onUnmounted(cleanup)
