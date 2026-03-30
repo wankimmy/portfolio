@@ -16,7 +16,15 @@
       </nav>
 
       <div class="site-nav__actions">
-        <a class="button button--ghost button--compact" href="mailto:putrafyp@gmail.com">Connect</a>
+        <a
+          class="button button--ghost button--compact"
+          href="https://wa.me/60177786836"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Connect on WhatsApp"
+        >
+          Connect
+        </a>
         <button
           class="site-nav__toggle"
           type="button"
@@ -40,7 +48,13 @@
       >
         {{ link.name }}
       </button>
-      <a class="button button--primary site-nav__mobile-cta" href="mailto:putrafyp@gmail.com">
+      <a
+        class="button button--primary site-nav__mobile-cta"
+        href="https://wa.me/60177786836"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Start a conversation on WhatsApp"
+      >
         Start a conversation
       </a>
     </div>

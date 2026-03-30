@@ -3,20 +3,29 @@
     <div class="section__inner">
       <div class="section-heading section-heading--split reveal">
         <div>
-          <p class="section-kicker">Validated Expertise</p>
-          <h2 class="section-title">Security, IoT, and practical upskilling that sharpens delivery work.</h2>
+          <p class="section-kicker">Certificates</p>
+          <h2 class="section-title">I'm bored so I want to learn something new.</h2>
         </div>
         <p class="section-index">02</p>
       </div>
 
       <div class="cert-grid">
-        <article v-for="cert in certificates" :key="cert.id" class="cert-card reveal">
+        <article v-for="cert in certificates" :key="cert.id" class="cert-card tilt-card reveal">
           <span class="cert-card__icon">{{ cert.icon }}</span>
           <p class="cert-card__issuer">{{ cert.issuer }}</p>
           <h3>{{ cert.name }}</h3>
           <p class="cert-card__date">{{ cert.date }}</p>
           <p class="cert-card__description">{{ cert.description }}</p>
-          <a class="text-link" :href="cert.file" target="_blank" rel="noopener">View credential</a>
+          <a
+            v-if="cert.file"
+            class="text-link"
+            :href="cert.file"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            View credential
+          </a>
+          <p v-else class="cert-card__note">Credential available on request.</p>
         </article>
       </div>
     </div>
@@ -27,11 +36,11 @@
 const certificates = [
   {
     id: 1,
-    name: 'Web Application Hacking And Defense',
+    name: 'Web Application Hacking and Defense',
     issuer: 'Condition Zebra',
     date: '2024',
-    description: 'Hands-on training in application security, attack surfaces, and defensive thinking.',
-    icon: '◉',
+    description: 'Hands-on security training for web apps.',
+    icon: 'SEC',
     file: '/assets/R001174-Safwan-Hakim-Bin-Yacob.pdf',
   },
   {
@@ -39,8 +48,8 @@ const certificates = [
     name: 'OWASP Security Foundation',
     issuer: 'OWASP Foundation',
     date: '2022',
-    description: 'A foundation in core web security risks, vulnerabilities, and safer engineering practice.',
-    icon: '◎',
+    description: 'Core web security basics and safe coding practice.',
+    icon: 'APP',
     file: '/assets/Safwan_Hakim_owasp.pdf',
   },
   {
@@ -48,8 +57,8 @@ const certificates = [
     name: 'IoT Security Certification',
     issuer: 'Tertiary Courses',
     date: '2021',
-    description: 'Security fundamentals for connected devices, deployment, and protected communications.',
-    icon: '◌',
+    description: 'Basic security for connected devices and communication.',
+    icon: 'IOT',
     file: '/assets/E-cert_IoT_Security_Safwan_Hakim.pdf',
   },
   {
@@ -57,8 +66,8 @@ const certificates = [
     name: 'Industry 4.0 E-Certification',
     issuer: 'Tertiary Courses',
     date: '2021',
-    description: 'Automation, IoT, data, and digital manufacturing concepts applied to modern operations.',
-    icon: '◍',
+    description: 'Basic knowledge of automation, IoT, and digital systems.',
+    icon: 'IR4',
     file: '/assets/IR4.0_E-Cert_Safwan_Hakim_Bin_Yacob.pdf',
   },
 ]

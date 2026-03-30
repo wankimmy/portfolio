@@ -2,53 +2,44 @@
   <section id="projects" class="section">
     <div class="section__inner">
       <div class="section-heading reveal">
-        <p class="section-kicker">Featured Artifacts</p>
-        <h2 class="section-title">Commercial products, operational tools, and customer-facing experiences.</h2>
+        <p class="section-kicker">Projects</p>
+        <h2 class="section-title">A few projects I have built.</h2>
       </div>
 
       <div class="projects-grid">
-        <article class="project-card project-card--featured reveal">
-          <img
-            class="project-card__image"
-            src="/assets/orbital-structure.png"
-            alt="Abstract futuristic orbital structure"
-          />
-          <div class="project-card__overlay"></div>
-          <div class="project-card__content">
-            <span class="project-card__eyebrow">Platform ecosystem</span>
-            <h3>Festivent</h3>
-            <p>
-              An event-vendor marketplace experience connecting organizers with professional
-              services, designed to make discovery and bookings feel streamlined.
-            </p>
-            <div class="project-card__chips">
-              <span>Laravel</span>
-              <span>PHP</span>
-              <span>MySQL</span>
-              <span>Bootstrap</span>
-            </div>
-            <a class="button button--ghost" href="https://festivent.com.my/home" target="_blank" rel="noopener">
-              Visit project
-            </a>
-          </div>
-        </article>
-
         <article
-          v-for="project in projects"
+          v-for="project in allProjects"
           :key="project.name"
-          class="project-card project-card--compact reveal"
+          class="project-card tilt-card reveal"
+          :class="{ 'project-card--featured': project.featured }"
           :style="{ '--project-glow': project.glow }"
         >
+          <img
+            v-if="project.image"
+            class="project-card__image"
+            :src="project.image"
+            :alt="project.alt"
+            loading="lazy"
+          />
           <div class="project-card__ambient"></div>
+          <div class="project-card__overlay"></div>
           <div class="project-card__content">
-            <span class="project-card__eyebrow">{{ project.category }}</span>
-            <h3>{{ project.name }}</h3>
-            <p>{{ project.description }}</p>
-            <div class="project-card__chips">
-              <span v-for="tech in project.tech" :key="tech">{{ tech }}</span>
+            <div class="project-card__top">
+              <span class="project-card__meta">{{ project.featured ? 'My Startup' : project.impact }}</span>
+              <span class="project-card__eyebrow">{{ project.category }}</span>
+              <h3>{{ project.name }}</h3>
+              <p>{{ project.description }}</p>
+              <div class="project-card__chips">
+                <span v-for="tech in project.tech" :key="tech">{{ tech }}</span>
+              </div>
             </div>
-            <a class="text-link" :href="project.live" target="_blank" rel="noopener">
-              Open {{ project.url }}
+            <a
+              class="button button--ghost button--compact project-card__cta"
+              :href="project.live"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {{ 'View' }}
             </a>
           </div>
         </article>
@@ -58,36 +49,68 @@
 </template>
 
 <script setup>
-const projects = [
+const allProjects = [
   {
+    featured: true,
+    name: 'Festivent',
+    image: null,
+    alt: '',
+    impact: 'Featured',
+    category: 'Marketplace',
+    description:
+      'An event marketplace that helps users find caterers, photographers, and more.',
+    live: 'https://festivent.com.my/home',
+    url: 'festivent.com.my',
+    tech: ['Laravel', 'Hostinger', 'MySQL', 'Bootstrap'],
+    glow: 'radial-gradient(circle at top left, rgba(124, 239, 245, 0.22), transparent 62%)',
+  },
+  {
+    featured: false,
     name: 'EZDisposal',
     url: 'ezdisposal.my',
-    category: 'Service operations',
+    impact: 'Service site',
+    category: 'Booking',
     description:
-      'A booking platform for scheduled disposal services with streamlined vehicle and service selection.',
+      'A booking website to dispose waste items easily.',
     live: 'https://ezdisposal.my',
-    tech: ['Laravel', 'PHP', 'MySQL'],
-    glow: 'radial-gradient(circle at top left, rgba(138, 235, 255, 0.2), transparent 68%)',
+    tech: ['Laravel', 'Hostinger', 'MySQL', 'Bootstrap'],
+    glow: 'radial-gradient(circle at top right, rgba(255, 180, 106, 0.18), transparent 64%)',
   },
   {
+    featured: false,
     name: 'Entrusol',
     url: 'entrusol.com',
-    category: 'Commerce experience',
+    impact: 'Online store',
+    category: 'E-commerce',
     description:
-      'A wellness-focused e-commerce site with integrated sales flows, product storytelling, and operational tooling.',
+      'An e-commerce site selling healthy foods.',
     live: 'https://entrusol.com',
-    tech: ['WordPress', 'WooCommerce', 'MySQL'],
-    glow: 'radial-gradient(circle at top right, rgba(189, 194, 255, 0.18), transparent 68%)',
+    tech: ['WooCommerce', 'MySQL', 'AWS'],
+    glow: 'radial-gradient(circle at center, rgba(124, 239, 245, 0.16), transparent 64%)',
   },
   {
+    featured: false,
     name: 'TTDI Meatpoint',
     url: 'ttdimeatpoint.com',
-    category: 'Restaurant platform',
+    impact: 'Restaurant site',
+    category: 'Website',
     description:
-      'A restaurant website featuring menu browsing, booking flows, and a clearer customer path to conversion.',
+      'A restaurant website that sells delicious food.',
     live: 'https://www.ttdimeatpoint.com',
-    tech: ['Laravel', 'PHP', 'Bootstrap'],
-    glow: 'radial-gradient(circle at bottom right, rgba(34, 211, 238, 0.16), transparent 70%)',
+    tech: ['Wix'],
+    glow: 'radial-gradient(circle at bottom right, rgba(255, 180, 106, 0.16), transparent 68%)',
+  },
+  {
+    featured: false,
+    name: 'Putra AI',
+    url: 'putra.ai',
+    impact: 'B2B Mini Saas Project',
+    category: 'Saas',
+    description:
+      'A B2B mini saas project that helps businesses automate their workflows.',
+    live: 'https://putra.ai',
+    tech: ['Laravel', 'Docker', 'Hostinger'],
+    glow: 'radial-gradient(circle at center, rgba(124, 239, 245, 0.16), transparent 64%)',
   },
 ]
 </script>
