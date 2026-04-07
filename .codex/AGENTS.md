@@ -21,7 +21,11 @@ If the user includes the standalone word `bossku` anywhere in the prompt, treat 
 | Phase | Model | Why |
 |-------|-------|-----|
 | Planning, architecture, strategy, analysis | `gpt-5.4` (or latest high-reasoning OpenAI model) | Deepest reasoning for complex/ambiguous problems |
+<<<<<<< HEAD
 | Implementation, execution, code generation | `gpt-4.1` (or latest fast OpenAI model) | Fast and capable for concrete tasks |
+=======
+| Implementation, execution, code generation | `gpt-5.4-mini` (or latest fast OpenAI model) | Fast and capable for concrete tasks |
+>>>>>>> 300de1b (update)
 
 - Always plan first. Never skip straight to execution on meaningful tasks.
 - Use the `planner` agent for the planning phase — it runs with high reasoning effort.
@@ -29,10 +33,49 @@ If the user includes the standalone word `bossku` anywhere in the prompt, treat 
 - Quick/trivial tasks (single-line fixes, factual lookups) may skip the split.
 - Update model names here when newer OpenAI models are released.
 
+<<<<<<< HEAD
 ## Default engineering posture
 
 - Always enter planning phase first using the highest-reasoning model available (currently `gpt-5.4`).
 - After plan is confirmed, execute with a faster model (currently `gpt-4.1`).
+=======
+## Task routing (mandatory — never skip)
+
+**Before acting on any meaningful task, you MUST:**
+
+1. Classify the task type (product / engineering / design / security / marketing / sales / architecture / etc.)
+2. Open root `AGENTS.md` → Quick reference to identify the matching skill(s)
+3. Read the relevant `ai-assistant/skills/<skill-name>/SKILL.md` file(s)
+4. State which skill(s) you loaded at the start of your response
+5. Then proceed with plan → execute
+
+**This is not optional.** Skipping skill loading means giving generic responses instead of domain-specific expertise. The user built this system to be used on every task.
+
+- Load the **minimum relevant skills** — do not load everything, but do not skip applicable ones.
+- When scope is ambiguous, default to the closest skill and note the assumption.
+
+**Mandatory output format — emit before any planning or code:**
+```text
+[TASK START]
+Memory read: <files, or "trivial">
+Skill(s): <name + path, or "trivial">
+Phase: <Plan/gpt-5.4 | Execute/gpt-5.4-mini | Trivial>
+Type: <cluster/intent>
+```
+
+**Closing block — emit before the final sentence:**
+```text
+[TASK END]
+Meaningful: <yes|no>
+Memory: <paths updated, or "none">
+Learning: <artifact+path, or "deferred: reason">
+```
+
+## Default engineering posture
+
+- Always enter planning phase first using the highest-reasoning model available (currently `gpt-5.4`).
+- After plan is confirmed, execute with a faster model (currently `gpt-5.4-mini`).
+>>>>>>> 300de1b (update)
 - Start with planning for non-trivial features, refactors, migrations, or risky fixes.
 - For new behavior, bug fixes, and risky refactors, prefer test-first or test-guided development when practical.
 - Gather evidence before editing. Trace the real execution path and read nearby code, tests, and docs first.
@@ -86,10 +129,17 @@ If no issues are found, say that clearly and mention residual risk or verificati
 ## Shared memory (mandatory)
 
 - `ai-assistant/memory/` is shared durable memory across Claude, Codex, and Cursor — not Codex-only.
+<<<<<<< HEAD
 - Read relevant memory files at the start of every session before acting.
 - Write durable findings back to memory after meaningful tasks.
 - Never treat memory as tool-local. Any insight written here must be usable by all tools.
 - Use `bash ./ai-assistant/scripts/learning-doctor.sh` when available before larger maintenance passes to catch stale counts, contradictory memory, and consumed continuation state.
+=======
+- **Canonical protocol:** `ai-assistant/references/memory-first-handoff-protocol.md` — read order **before** substantive work on each non-trivial user turn; structured write **before** declaring done (usually `learning-log.md`); trivial exception with explicit “memory unchanged” in the reply.
+- Never treat memory as tool-local. Any insight written here must be usable by all tools.
+- Use `bash ./ai-assistant/scripts/learning-doctor.sh` when available before larger maintenance passes to catch stale counts, contradictory memory, and consumed continuation state.
+- Enforced by [TASK START] header — blank 'Memory read:' on non-trivial turn = protocol violation.
+>>>>>>> 300de1b (update)
 
 ## Codex-specific notes
 

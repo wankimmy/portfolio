@@ -49,7 +49,21 @@ The **tool-neutral contract** for model phase split, shared memory, learning pro
 | **`.claude/rules/bosskuai.md`** | Claude rule mirror + links |
 | **`.codex/AGENTS.md`** | Codex-specific model names layered on the same behaviors |
 
+<<<<<<< HEAD
 **Definition of Done:** see **Success criteria** below and **`CLAUDE.md`** § Definition of Done for the full checkbox form. **Memory layout and promotion:** see `ai-assistant/references/adr/2026-03-30-memory-organization.md`.
+=======
+**Definition of Done:** see **Success criteria** below and **`CLAUDE.md`** § Definition of Done for the full checkbox form. **Memory layout and promotion:** see `ai-assistant/references/adr/2026-03-30-memory-organization.md`. **Cross-tool read/write template:** `ai-assistant/references/memory-first-handoff-protocol.md`.
+
+## Session Start Protocol (every new session — run once)
+
+1. Read `ai-assistant/memory/active-continuation.md` — if non-empty, state unfinished task, ask continue or new.
+2. Read `ai-assistant/memory/agent-profile.md`
+3. Read `ai-assistant/memory/project-understanding.md`
+4. Read last 1–3 entries of `ai-assistant/memory/learning-log.md`
+5. State: "Session started. Memory loaded: [files]. [No continuation | Unfinished: <goal> — continue or new?]"
+
+Per-turn enforcement: **Task Start Protocol** below.
+>>>>>>> 300de1b (update)
 
 ## Model assignment (mandatory — applies to all tools)
 
@@ -58,7 +72,11 @@ The **tool-neutral contract** for model phase split, shared memory, learning pro
 | Tool | Planning model | Execution model |
 |------|---------------|-----------------|
 | Claude Code | `claude-opus-4-6` | `claude-sonnet-4-6` |
+<<<<<<< HEAD
 | Codex | `gpt-5.4` (high reasoning effort via planner agent) | `gpt-5.2` |
+=======
+| Codex | `gpt-5.4` (high reasoning effort via planner agent) | `gpt-5.4-mini` |
+>>>>>>> 300de1b (update)
 | Cursor | Strongest available reasoning model | Fastest capable model |
 
 - **Never skip the planning phase** on meaningful tasks. Always plan first, then execute.
@@ -69,10 +87,22 @@ The **tool-neutral contract** for model phase split, shared memory, learning pro
 ## Shared memory (mandatory — applies to all tools)
 
 - `ai-assistant/memory/` is **shared durable memory across all tools** — Claude, Codex, and Cursor.
+<<<<<<< HEAD
 - At the start of every session, read the memory files relevant to the current task.
 - After meaningful tasks, write durable findings back to `ai-assistant/memory/`.
 - Never treat memory as tool-local. What is written here must be usable by any tool in any session.
 - Memory files: `agent-profile.md`, `project-understanding.md`, `learning-log.md`, `bug-patterns.md`, `market-notes.md`, `active-continuation.md` (ephemeral handoffs only; clear when done).
+=======
+- Never treat memory as tool-local. What is written here must be usable by any tool in any session.
+- Memory files: `agent-profile.md`, `project-understanding.md`, `learning-log.md`, `bug-patterns.md`, `market-notes.md`, `active-continuation.md` (ephemeral handoffs only; clear when done).
+- **Canonical template:** `ai-assistant/references/memory-first-handoff-protocol.md` — read order, write order, `learning-log.md` fields, trivial exception, `FOR_NEXT_MODEL` block.
+
+### Memory-first protocol
+
+- **Read before act:** On each **user turn**, before substantive edits or repo-specific conclusions, follow the **read order** in `memory-first-handoff-protocol.md` (continuation → profile → project understanding → recent `learning-log` → task-specific memory). Not only “first session of the day.”
+- **Write before done:** On each **non-trivial** turn, before declaring done, persist a structured handoff per that protocol (usually append to `learning-log.md`). Another model or tool must be able to continue **without chat history**.
+- **Trivial exception:** Single-line fixes, pure lookups, or no-repo-impact Q&A — **no** required `learning-log` entry; end the reply with one explicit sentence that memory was intentionally unchanged (see protocol).
+>>>>>>> 300de1b (update)
 
 ## Task classifier (run first)
 
@@ -98,7 +128,25 @@ Use this decision tree before loading any skill:
 6. **Evidence gate**
    - Read relevant code/docs/specs before conclusions.
 7. **Output gate**
+<<<<<<< HEAD
    - State: task classification, selected skills, model recommendation, and verification plan.
+=======
+   - Emit the **[TASK START] header** from § Task Start Protocol. The header IS the output.
+   - For **non-trivial** tasks: state which `ai-assistant/memory/` file(s) were updated (paths), **or** that memory was intentionally unchanged with a **one-line reason** (trivial / no durable delta only — not silent skip).
+
+## Task Start Protocol (mandatory — every non-trivial response)
+
+Before the first substantive sentence, emit:
+```text
+[TASK START]
+Memory read: <files, or "trivial">
+Skill(s): <name + path, or "trivial">
+Phase: <Plan/Opus 4.6 | Execute/Sonnet 4.6 | Trivial>
+Type: <cluster/intent>
+```
+The header IS the classifier output (Output gate step 7). Do not describe classification — emit the header.
+Trivial tasks: emit with "trivial" in all fields.
+>>>>>>> 300de1b (update)
 
 ## Skill roster (when to use which)
 
@@ -123,6 +171,12 @@ Classify into a **role cluster** first, then choose the minimum skill set. This 
 | **Engineering** | code-revamp | Safe modernization and legacy structural cleanup |
 | **Engineering** | coding-best-practices | Implementation quality, maintainability, and testing posture |
 | **Engineering** | polyglot-engineering | Stack-specific guidance across languages and frameworks |
+<<<<<<< HEAD
+=======
+| **Engineering** | performance-profiling | CPU/memory profiling, bottleneck diagnosis, query optimization, caching, flame graph interpretation |
+| **Engineering** | integration-testing | Integration test design, contract testing (CDC/Pact), test doubles, fixture management, seam coverage |
+| **Engineering** | incident-response | Severity classification, on-call coordination, stabilization, timeline reconstruction, blameless postmortem |
+>>>>>>> 300de1b (update)
 | **Design** | ui-ux-design-to-code | UX/UI quality, accessibility, design systems, and design-to-code guidance |
 | **Design** | i18n-l10n | Internationalization, localization workflows, and RTL/expansion readiness |
 | **Design** | 3d-web-development | WebGL/Three.js/R3F immersive web experience delivery |
@@ -158,6 +212,12 @@ Classify into a **role cluster** first, then choose the minimum skill set. This 
 | Build a feature | "Plan then implement" / "Use engineering delivery" | engineering-delivery, coding-best-practices |
 | API contract or webhook design | "Design this API" / "How should we version this?" | api-design, software-architecture |
 | CI/CD, containers, or infra | "Review our pipeline" / "Design deploy flow" | devops-iac, engineering-delivery, cybersecurity-risk |
+<<<<<<< HEAD
+=======
+| Performance profiling or bottleneck diagnosis | "Profile this slow endpoint" / "Find the memory leak" | performance-profiling, data-architecture |
+| Integration test design or contract testing | "Design the integration test layer" / "Set up CDC tests" | integration-testing, engineering-delivery |
+| Active incident or postmortem | "We have a P1" / "Run a blameless postmortem" | incident-response, bug-finding |
+>>>>>>> 300de1b (update)
 | Schema, migration, or warehouse design | "Review this schema" / "Plan the migration" | data-architecture, software-architecture |
 | UX/UI and accessibility | "Review for UX and accessibility" | ui-ux-design-to-code |
 | Localization or multilingual UX | "Audit i18n" / "Make this app localization-ready" | i18n-l10n, ui-ux-design-to-code |
@@ -179,8 +239,13 @@ For larger efforts you can run the assistant in a phase-aware way. The assistant
 |-------|--------|-------------------|
 | **Discovery** | What we're building, for whom, evidence | project-understanding, product-strategy, market-analysis |
 | **Strategy** | Roadmap, scope, priorities, ownership | planning-execution, software-architecture, api-design, data-architecture, analytics-metrics |
+<<<<<<< HEAD
 | **Build** | Implementation with quality gates | engineering-delivery, devops-iac, ui-ux-design-to-code, i18n-l10n, 3d-web-development, coding-best-practices, bug-finding, rigorous-code-review |
 | **Harden** | Security, logic, readiness | cybersecurity-risk, legal-compliance, business-logic-review, agent-security-hardening |
+=======
+| **Build** | Implementation with quality gates | engineering-delivery, devops-iac, ui-ux-design-to-code, i18n-l10n, 3d-web-development, coding-best-practices, bug-finding, rigorous-code-review, performance-profiling, integration-testing |
+| **Harden** | Security, logic, readiness | cybersecurity-risk, legal-compliance, business-logic-review, agent-security-hardening, incident-response |
+>>>>>>> 300de1b (update)
 | **Launch** | Readiness, GTM, PMF signals | launch-commercialization, seo-geo, **Growth**: marketing-growth, paid-acquisition-monetization; **Sales**: sales-strategy |
 
 When the user says e.g. "We're in the build phase" or "Run the launch checklist", prefer the skills for that phase and any cross-cutting rules (plan-first, model recommendation, verification).
@@ -191,7 +256,11 @@ Use the right skill without the user having to ask, grouped by role cluster:
 
 - **Orchestration**: unfamiliar codebase -> `project-understanding`; new utility/dependency/integration -> `search-first`; skills/rules sprawl -> `skill-stocktake` or `rules-distill`; post-meaningful task -> `continuous-learning`; heavy parallel/risky scope -> `subagent-delegation`.
 - **Product**: roadmap/prioritization/owner or milestone drift -> `planning-execution`; funnels/KPIs/experiments -> `analytics-metrics`; launch-readiness framing -> `launch-commercialization`.
+<<<<<<< HEAD
 - **Engineering**: complex implementation/refactor -> `engineering-delivery`; CI/CD/container/infra changes -> `devops-iac`; schema/migration/warehouse/data pipeline work -> `data-architecture`; structural cleanup -> `code-revamp`.
+=======
+- **Engineering**: complex implementation/refactor -> `engineering-delivery`; CI/CD/container/infra changes -> `devops-iac`; schema/migration/warehouse/data pipeline work -> `data-architecture`; structural cleanup -> `code-revamp`; performance/bottleneck/profiling work -> `performance-profiling`; integration test layer or contract test design -> `integration-testing`; P1/P2 production incident or postmortem -> `incident-response`.
+>>>>>>> 300de1b (update)
 - **Design**: UI quality/accessibility -> `ui-ux-design-to-code`; multilingual/locale/RTL risks -> `i18n-l10n`; 3D/WebGL/immersive experiences -> `3d-web-development`.
 - **Security**: auth/billing/external API/input trust boundaries -> `cybersecurity-risk`; agent workspace/integration/memory safety -> `agent-security-hardening`; consent/retention/vendor/policy concerns -> `legal-compliance`.
 - **Quality**: code changed -> `rigorous-code-review` plus `bug-finding` as needed; strict skeptical review requested -> `rigorous-code-review`; incidents requiring DB/log/queue/webhook correlation -> `bug-finding` deep investigation mode with `business-logic-review` when invariants are involved.
@@ -210,7 +279,12 @@ Before considering a meaningful task done:
 - Verification was done (tests, diff review, or explicit verification steps).
 - No critical security, business-logic, or product assumptions left unconfirmed; if something is inferred, say so and note confidence.
 - Learning was promoted to the right place (memory, checklist, pitfall, playbook, or skill) when applicable.
+<<<<<<< HEAD
 - Shared memory and continuation state were left fresher than they were before the task started.
+=======
+- **Memory gate:** Shared memory was updated per `memory-first-handoff-protocol.md` **or** the final reply explicitly states **no repo memory update** with a valid trivial/no-durable-delta reason — never silent skip.
+- Shared memory and continuation state were left fresher than they were before the task started **when non-trivial** (or explicitly unchanged per protocol).
+>>>>>>> 300de1b (update)
 
 ## Local skills
 
@@ -248,6 +322,12 @@ Before considering a meaningful task done:
 | `bosskuai-coding-best-practices` | `ai-assistant/skills/bosskuai-coding-best-practices/SKILL.md` |
 | `bosskuai-context-limit-continuation` | `ai-assistant/skills/bosskuai-context-limit-continuation/SKILL.md` |
 | `bosskuai-polyglot-engineering` | `ai-assistant/skills/bosskuai-polyglot-engineering/SKILL.md` |
+<<<<<<< HEAD
+=======
+| `bosskuai-performance-profiling` | `ai-assistant/skills/bosskuai-performance-profiling/SKILL.md` |
+| `bosskuai-integration-testing` | `ai-assistant/skills/bosskuai-integration-testing/SKILL.md` |
+| `bosskuai-incident-response` | `ai-assistant/skills/bosskuai-incident-response/SKILL.md` |
+>>>>>>> 300de1b (update)
 | `bosskuai-market-analysis` | `ai-assistant/skills/bosskuai-market-analysis/SKILL.md` |
 | `bosskuai-marketing-growth` | `ai-assistant/skills/bosskuai-marketing-growth/SKILL.md` |
 | `bosskuai-paid-acquisition-monetization` | `ai-assistant/skills/bosskuai-paid-acquisition-monetization/SKILL.md` |
@@ -264,8 +344,14 @@ Deprecated alias skills (routing compatibility only):
 ## Local memory
 
 - Memory lives under `ai-assistant/memory/`.
+<<<<<<< HEAD
 - Read only the memory files relevant to the current task.
 - Update memory only with durable findings.
+=======
+- Follow **`ai-assistant/references/memory-first-handoff-protocol.md`** for **which** files to read per turn and **how** to append handoffs.
+- Default handoff vehicle for “next model picks up” is **`learning-log.md`** (dated sections); use `project-understanding.md` / `agent-profile.md` when durable product or stack facts change.
+- Update memory only with durable findings (no secrets, no one-off debug chatter).
+>>>>>>> 300de1b (update)
 - Use `ai-assistant/memory/agent-profile.md` to customize this starter for a specific company, product, or industry.
 - Use `ai-assistant/memory/project-understanding.md` to preserve durable knowledge about what a repo or product is actually about after reading the source.
 
@@ -282,6 +368,23 @@ Deprecated alias skills (routing compatibility only):
 - Use `ai-assistant/references/checklists/learning-promotion-checklist.md` to decide where a learning belongs.
 - Run `bash ./ai-assistant/scripts/learning-doctor.sh` periodically or before large maintenance passes to catch stale memory, contradictory counts, and consumed continuation state.
 
+<<<<<<< HEAD
+=======
+### Post-task [TASK END] block (mandatory)
+
+Emit before the final sentence of every non-trivial task:
+```text
+[TASK END]
+Meaningful: <yes|no>
+Memory: <paths updated, or "none">
+Learning: <artifact+path, or "deferred: reason">
+```
+
+**Meaningful = yes** if ANY: file changed / decision made / bug found / skill applied non-generically / pattern 2+ times / gap surfaced.
+**Meaningful = no** only if ALL: no files + no repo conclusion + pure lookup.
+Silent skips are protocol violations. Trivial tasks emit `Meaningful: no`.
+
+>>>>>>> 300de1b (update)
 ## Working rules
 
 ### Clarify first (ambiguity protocol)

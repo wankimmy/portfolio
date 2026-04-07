@@ -10,6 +10,10 @@ Use this skill when the user wants to know **which AI model fits a specific task
 ## How this differs from nearby skills
 
 - **`bosskuai-context-limit-continuation`**: handles the handoff mechanics when context is exhausted; this skill recommends *which model* to use for the remaining work. Load both together at handoff.
+<<<<<<< HEAD
+=======
+- **`bosskuai-cross-model-escalation`**: decides when to get another model involved because the current one is blocked or brittle; this skill chooses the best helper model once that escalation is justified.
+>>>>>>> 300de1b (update)
 
 ## Maintenance (time-sensitive)
 
@@ -68,6 +72,11 @@ Use this skill when the user wants to know **which AI model fits a specific task
 
 5. **Flag time-sensitivity** — Model capabilities change fast. If this recommendation depends on current benchmarks or pricing, say so and recommend re-checking.
 
+<<<<<<< HEAD
+=======
+**If the current model is already mid-task and stuck:** pair this skill with **`bosskuai-cross-model-escalation`** so the helper request is scoped tightly instead of becoming a vague tool switch.
+
+>>>>>>> 300de1b (update)
 ## Task-to-model quick reference
 
 | Task type | Recommended model |
@@ -89,6 +98,10 @@ Use this skill when the user wants to know **which AI model fits a specific task
 - Do not recommend the cheapest model for tasks where reasoning quality directly affects correctness.
 - Always provide a fallback — tool availability changes.
 - Caveat time-sensitive claims: "as of August 2025."
+<<<<<<< HEAD
+=======
+- If the active model is blocked mid-task, do not stop at model naming alone; pair with `bosskuai-cross-model-escalation` and define the exact helper question.
+>>>>>>> 300de1b (update)
 
 ## Output format
 
@@ -109,3 +122,7 @@ Caveats: [any time-sensitive claims]
 
 - `../../references/playbooks/model-selection-playbook.md`
 - `../../references/checklists/model-selection-checklist.md`
+<<<<<<< HEAD
+=======
+- Pair with **`bosskuai-cross-model-escalation`** when the current model needs backup mid-task
+>>>>>>> 300de1b (update)
