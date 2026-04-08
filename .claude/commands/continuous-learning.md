@@ -2,8 +2,6 @@
 
 Use this command after meaningful work, reviews, incidents, or repeated observations to convert lessons into durable repo improvements.
 
-<<<<<<< HEAD
-=======
 ## Meaningfulness gate (run first — binary)
 
 Meaningful = ANY true:
@@ -17,7 +15,6 @@ Meaningful = ANY true:
 YES → run full triage below.
 NO to all → emit `[TASK END] Meaningful: no, Reason: <one line>` and stop.
 
->>>>>>> 300de1b (update)
 ## Intent
 
 - capture the strongest durable lessons from recent work
@@ -41,8 +38,6 @@ NO to all → emit `[TASK END] Meaningful: no, Reason: <one line>` and stop.
 - routing decisions
 - freshness issues
 - smallest safe promotion actions
-<<<<<<< HEAD
-=======
 
 ## Mandatory output format
 
@@ -60,4 +55,3 @@ Promotion: <one-line description>
 Deferred: <list or "none">
 ```
 Copy-paste directly into `learning-log.md`.
->>>>>>> 300de1b (update)

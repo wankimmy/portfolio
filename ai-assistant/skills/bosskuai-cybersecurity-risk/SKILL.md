@@ -47,11 +47,7 @@ Apply STRIDE systematically for each trust boundary and sensitive flow:
    - A03 Injection — SQL, NoSQL, shell, LDAP, template, path traversal?
    - A04 Insecure Design — missing rate limits, trust assumptions baked in, no abuse cases considered?
    - A05 Security Misconfiguration — default creds, open cloud storage, verbose error messages?
-<<<<<<< HEAD
-   - A06 Vulnerable Dependencies — outdated packages with known CVEs?
-=======
    - A06 Vulnerable Dependencies — outdated packages with known CVEs? Is there a SBOM? Are transitive dependencies pinned?
->>>>>>> 300de1b (update)
    - A07 Authentication Failures — broken session management, weak credentials, no MFA where needed?
    - A08 Data Integrity Failures — unsigned updates, deserializing untrusted data?
    - A09 Logging and Monitoring Failures — no audit trail for sensitive operations, no alerting on anomalies?
@@ -75,8 +71,6 @@ Apply STRIDE systematically for each trust boundary and sensitive flow:
 
 8. **Separate confirmed issues from inferred risks** — State evidence for confirmed findings; label inferred risks clearly.
 
-<<<<<<< HEAD
-=======
 ## Supply chain security
 
 Use this section when reviewing dependency management, open-source usage, CI/CD supply chain, or third-party code ingestion.
@@ -111,7 +105,6 @@ Use this section when reviewing dependency management, open-source usage, CI/CD 
 - Do not ingest third-party IaC modules or GitHub Actions from unvetted sources without reviewing their content.
 - Pin third-party container base images to digest hashes in production builds, not floating tags.
 
->>>>>>> 300de1b (update)
 ## Guardrails
 
 - If the request is general, ambiguous, or touches many files — ask clarifying yes/no questions **before acting**. Use numbered bullets with explicit answer format: e.g. `1-yes/no  2-A/B`.

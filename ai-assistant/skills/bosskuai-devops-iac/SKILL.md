@@ -48,17 +48,11 @@ Use this skill when the main question is **how software is built, shipped, confi
 - Are third-party actions/modules pinned and reviewed?
 
 **Observability and recovery**
-<<<<<<< HEAD
-- Are logs, metrics, alerts, and health checks enough to operate safely?
-- What is the rollback path?
-- What fails closed versus open?
-=======
 - Are logs structured (JSON or key-value), with consistent fields (trace_id, request_id, service, level, timestamp)?
 - Are OpenTelemetry traces instrumented at service entry points and propagated across async boundaries?
 - Are SLOs defined? Are error budgets tracked and visible to the team?
 - Are distributed trace spans linked across services so a single user request can be followed end-to-end?
 - What is the rollback path? What fails closed versus open?
->>>>>>> 300de1b (update)
 
 ## Workflow
 
@@ -98,8 +92,6 @@ Rollback and failure handling:
   [current state] — [gap] — [improvement]
 ```
 
-<<<<<<< HEAD
-=======
 ## Observability instrumentation
 
 Use this section when the task involves adding or reviewing observability coverage, not just checking that alerts exist.
@@ -144,7 +136,6 @@ Use these patterns when a deployment touches a high-risk surface or when the tea
 - This decouples deployment risk from release risk.
 - Define the flag cleanup date at creation time — feature flags left on indefinitely become technical debt.
 
->>>>>>> 300de1b (update)
 ## References
 
 - `../../references/checklists/devops-iac-checklist.md`

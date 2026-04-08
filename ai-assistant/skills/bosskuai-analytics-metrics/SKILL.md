@@ -37,15 +37,12 @@ Use this skill when the main question is **what to measure, how to instrument it
 - Can drop-off be explained by available events?
 - Are experiment variants and exposure events explicit?
 
-<<<<<<< HEAD
-=======
 **Retention and lifecycle**
 - Are D1/D7/D30 retention curves defined and baselined?
 - Are users segmented by acquisition cohort, so retention is compared on an apples-to-apples basis?
 - Is the distinction between resurrection (returning after churn) and retention (never churned) explicit?
 - Is churn defined precisely: no activity for N days? Explicit cancellation? Both?
 
->>>>>>> 300de1b (update)
 **Attribution and identity**
 - How are users, sessions, orgs, devices, and anonymous states linked?
 - Where can attribution be lost or duplicated?
@@ -101,8 +98,6 @@ Recommended instrumentation slice:
   [change] — [why] — [how to validate]
 ```
 
-<<<<<<< HEAD
-=======
 ## Retention and lifecycle metrics
 
 Use this section when the task involves understanding whether users are staying, why they leave, or how to measure product stickiness.
@@ -142,7 +137,6 @@ Define explicit lifecycle stages and instrument the transitions between them:
 
 Instrument the transition between each adjacent stage, not just the stages themselves — the transition events reveal where users drop off.
 
->>>>>>> 300de1b (update)
 ## References
 
 - `../../references/checklists/analytics-metrics-checklist.md`

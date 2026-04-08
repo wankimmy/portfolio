@@ -10,13 +10,6 @@ read_hook_input
 repo_root="$(resolve_repo_root "${1:-$script_dir/../..}")"
 
 {
-<<<<<<< HEAD
-  echo "[BosskuAI hook] Session start reminder"
-  echo "- Treat AGENTS.md as the workspace source of truth."
-  echo "- If repo context is unclear, use bosskuai-project-understanding first."
-  echo "- For meaningful tasks, plan before execution."
-  echo "- Shared memory lives under ai-assistant/memory/ and should only be updated deliberately."
-=======
   echo "[BosskuAI] Auto-enforce — emit [TASK START] before responding:"
   echo "  1. READ  ${repo_root}/ai-assistant/memory/ (continuation→profile→understanding→log)"
   echo "  2. ROUTE intent→cluster→skill via ${repo_root}/AGENTS.md Quick reference"
@@ -28,7 +21,6 @@ repo_root="$(resolve_repo_root "${1:-$script_dir/../..}")"
   echo "  engineering→engineering-delivery | security→cybersecurity-risk | product→product-strategy"
   echo "  quality→rigorous-code-review | architecture→software-architecture | growth→marketing-growth"
   echo "  understand→project-understanding | review→business-logic-review | ux→ui-ux-design-to-code"
->>>>>>> 300de1b (update)
 } >&2
 
 write_hook_output

@@ -55,8 +55,6 @@ Apply whichever are relevant; skip clearly irrelevant ones:
 - Does the design apply least-privilege (services only access what they need)?
 - Are secrets injected at runtime, never baked in?
 
-<<<<<<< HEAD
-=======
 ## Advanced patterns guide
 
 Use this section when a team is considering event sourcing, CQRS, or horizontal scaling patterns. These patterns carry significant complexity cost — consult this section to confirm fit before recommending them.
@@ -134,7 +132,6 @@ Use this section when a team is considering event sourcing, CQRS, or horizontal 
 | Cross-service data coupling and scaling bottleneck | Federation |
 | Distributed write load across homogeneous data | Sharding |
 
->>>>>>> 300de1b (update)
 ## Workflow
 
 1. **Read the current architecture** — Identify structure from code, not docs. Map: modules, layers, entry points, key data flows, external dependencies.
