@@ -113,6 +113,13 @@
       "keywords": ["terraform", "docker", "pipeline", "runtime"]
     },
     {
+      "id": "bosskuai-docker",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["dockerize app", "Dockerfile", "Docker Compose", "docker compose up"],
+      "keywords": ["docker", "compose.yaml", "Dockerfile", ".env", "volumes", "networks", "secrets", "bind mount"]
+    },
+    {
       "id": "bosskuai-codebase-analysis",
       "cluster": "engineering",
       "status": "active",
@@ -174,6 +181,20 @@
       "status": "active",
       "triggers": ["Lenis smooth scroll", "smooth scrolling", "GSAP Lenis sync", "scroll snap"],
       "keywords": ["lenis", "smooth scroll", "autoRaf", "ReactLenis", "VueLenis", "lenis/snap", "anchors"]
+    },
+    {
+      "id": "bosskuai-design-systems",
+      "cluster": "design",
+      "status": "active",
+      "triggers": ["create design system", "generate DESIGN.md", "design tokens", "design system audit", "brand design system"],
+      "keywords": ["design system", "DESIGN.md", "tokens", "color palette", "typography scale", "component specs", "brand system", "getdesign.md"]
+    },
+    {
+      "id": "bosskuai-caveman",
+      "cluster": "orchestration",
+      "status": "active",
+      "triggers": ["compress responses", "less tokens", "caveman mode", "token efficient", "be brief"],
+      "keywords": ["caveman", "compressed responses", "token reduction", "terse output", "intensity", "wenyan"]
     },
     {
       "id": "bosskuai-cybersecurity-risk",
@@ -363,6 +384,76 @@
       "status": "active",
       "triggers": ["nuxt development", "nuxt audit", "nuxt best practices", "vue/nuxt project"],
       "keywords": ["Nuxt", "Vue", "SSR", "Nitro", "useFetch", "auto-imports", "file-based routing", "nuxt.config"]
+    },
+    {
+      "id": "bosskuai-claude-code-setup",
+      "cluster": "orchestration",
+      "status": "active",
+      "triggers": ["Claude Code setup", "CLAUDE.md setup", "MCP config", "hooks config", "Claude Code onboarding"],
+      "keywords": ["CLAUDE.md", "MCP", "hooks", "commands", "permissions", "Claude Code"]
+    },
+    {
+      "id": "bosskuai-claude-md-management",
+      "cluster": "orchestration",
+      "status": "active",
+      "triggers": ["audit CLAUDE.md", "improve Claude instructions", "rule cleanup", "Claude rule drift"],
+      "keywords": ["CLAUDE.md", "rules", "instruction hygiene", "claude rule", "overlap control"]
+    },
+    {
+      "id": "bosskuai-cross-model-escalation",
+      "cluster": "orchestration",
+      "status": "active",
+      "triggers": ["model stuck", "low confidence", "escalate to another model", "thrashing"],
+      "keywords": ["escalation", "model switch", "blocked", "second opinion", "helper model"]
+    },
+    {
+      "id": "bosskuai-github-workflow",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["GitHub issues", "pull request", "GitHub Actions", "releases", "Dependabot"],
+      "keywords": ["PR", "issues", "Actions", "releases", "repo metadata", "GitHub MCP"]
+    },
+    {
+      "id": "bosskuai-incident-response",
+      "cluster": "quality",
+      "status": "active",
+      "triggers": ["production incident", "system down", "incident triage", "postmortem"],
+      "keywords": ["severity", "escalation", "on-call", "timeline", "blameless postmortem"]
+    },
+    {
+      "id": "bosskuai-integration-testing",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["integration test design", "contract testing", "CDC", "Pact", "test seams"],
+      "keywords": ["contract test", "test doubles", "fixtures", "provider", "consumer", "Pact"]
+    },
+    {
+      "id": "bosskuai-mongodb",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["MongoDB design", "MongoDB index", "aggregation pipeline", "MongoDB migration", "Atlas"],
+      "keywords": ["MongoDB", "collection", "index", "aggregation", "Atlas", "schema validation"]
+    },
+    {
+      "id": "bosskuai-operations",
+      "cluster": "product",
+      "status": "active",
+      "triggers": ["business operations", "vendor management", "SOPs", "RACI", "operating cadence"],
+      "keywords": ["SOP", "RACI", "vendor", "capacity planning", "change management", "process docs"]
+    },
+    {
+      "id": "bosskuai-performance-profiling",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["performance profiling", "bottleneck diagnosis", "why is this slow", "flame graph", "memory growth"],
+      "keywords": ["profiler", "flame graph", "CPU", "memory", "query optimization", "caching"]
+    },
+    {
+      "id": "bosskuai-skill-creator",
+      "cluster": "orchestration",
+      "status": "active",
+      "triggers": ["create skill", "improve skill", "skill quality audit", "benchmark skill", "new bosskuai skill"],
+      "keywords": ["skill design", "frontmatter", "SKILL.md", "validation prompt", "skill scope"]
     },
     {
       "id": "bosskuai-root-cause-investigation",

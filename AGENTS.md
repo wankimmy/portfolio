@@ -79,13 +79,14 @@ Per-turn behavior: use the sparse **Task Start Protocol** below.
 
 - `ai-assistant/memory/` is **shared durable memory across all tools** — Claude, Codex, and Cursor.
 - Never treat memory as tool-local. What is written here must be usable by any tool in any session.
-- Memory files: `agent-profile.md`, `project-understanding.md`, `learning-log.md`, `bug-patterns.md`, `market-notes.md`, `active-continuation.md` (ephemeral handoffs only; clear when done).
+- Memory files: `agent-profile.md`, `project-understanding.md`, `plan-log.md`, `learning-log.md`, `bug-patterns.md`, `market-notes.md`, `active-continuation.md` (ephemeral handoffs only; clear when done), plus `semantic-memory.sqlite3` + `vector-config.json` for semantic recall.
 - **Canonical template:** `ai-assistant/references/memory-first-handoff-protocol.md` — retrieval order, write threshold, compact `learning-log.md` fields, sparse reporting, `FOR_NEXT_MODEL` block.
 
 ### Memory-first protocol
 
-- **Read before act:** Before substantive edits or repo-specific conclusions, retrieve the **minimum relevant memory** per `memory-first-handoff-protocol.md`. Prefer continuation state, recent handoff entries, and task-specific memory over dumping every memory file into context. Read broad profile/project files only when the task needs repo/product orientation or durable context might affect the answer.
-- **Write before done:** Persist memory only when the task creates a durable delta, a cross-tool handoff, or an importance score of **4/5 or higher** per the protocol. Batch memory writes at task completion instead of writing after every turn.
+- **Read before act:** Before substantive edits or repo-specific conclusions, retrieve the **minimum relevant memory** per `memory-first-handoff-protocol.md`. Read `active-continuation.md` directly, then prefer vector hits from `semantic-memory.sqlite3` over broad file dumps. Open profile/project/plan files only when the task needs that wider context.
+- **Plan-store-execute (gated):** For non-trivial tasks, plan first. If the plan is durable enough to matter later, write a compact entry to `ai-assistant/memory/plan-log.md`, sync vector memory, then execute.
+- **Write before done:** After execution, persist durable outcomes, learnings, or handoff state per the protocol. Refresh semantic recall with `python3 ./ai-assistant/scripts/vector_memory.py sync` whenever indexed memory changed.
 - **Trivial/no-delta exception:** Single-line fixes, pure lookups, no-repo-impact Q&A, or meaningful work with no durable delta do **not** require a `learning-log.md` append. In normal execution mode, do not print a memory skip line unless the user asks for debug/protocol output.
 
 ## Token-efficient operating standard
@@ -105,8 +106,10 @@ Rules for token control:
 - Use short status notes only when useful, e.g. `Memory updated: learning-log.md` or `[Debug: engineering-delivery/gpt-5.4]`.
 - Do not repeat static rules, personality, or long memory dumps in dynamic prompts. Cache static instructions where the runtime supports it.
 - Retrieve memory by relevance: top 3-5 chunks/files for the task, using filenames, keywords, or embeddings if an orchestrator provides retrieval.
+- Tool-specific entry points should carry deltas only. Do not duplicate the full skill roster, quick-reference tables, or root operating rules into `.codex/AGENTS.md`, `.cursor/rules/`, or `.claude/rules/`.
 - Route to one model/tool by default. Use multi-model or parallel work only for independent workstreams, validation, or a clear capability gap.
 - Be concise by default. Explain reasoning when asked, when risk is high, or when a decision needs tradeoff clarity.
+- Default reply style is caveman-compressed unless clarity or safety needs normal prose.
 
 ## Task classifier (run first)
 
@@ -176,6 +179,7 @@ Classify into a **role cluster** first, then choose the minimum skill set. This 
 | **Engineering** | rapid-prototype | Fast proof-of-concepts, demos, MVP scaffolds, and prototype debt ledgers |
 | **Engineering** | github-workflow | GitHub issues, PRs, Actions, releases, Dependabot, and repo workflow operations |
 | **Engineering** | devops-iac | CI/CD, infra-as-code, runtime reliability, rollback and secrets posture |
+| **Engineering** | docker | Dockerfile and Docker Compose setup, `.env`, volumes, networks, and one-command container startup |
 | **Engineering** | mongodb | MongoDB collection design, indexes, aggregation, migrations, and operational checks |
 | **Engineering** | nuxt-development | Nuxt 3/4 implementation and audit guidance grounded in current docs |
 | **Engineering** | codebase-analysis | Evidence-based execution-path and module-boundary analysis |
@@ -191,6 +195,8 @@ Classify into a **role cluster** first, then choose the minimum skill set. This 
 | **Design** | 3d-web-development | WebGL/Three.js/R3F immersive web experience delivery |
 | **Design** | gsap-animation | GSAP timelines, ScrollTrigger, responsive motion, and framework-safe cleanup |
 | **Design** | lenis-smooth-scroll | Lenis smooth scrolling, scroll plumbing, anchors, GSAP sync, and scroll accessibility |
+| **Design** | design-systems | Design system creation, DESIGN.md generation, token definition, component specification, brand calibration |
+| **Orchestration** | caveman | Compressed caveman-style responses, ~75% output token savings, intensity levels lite/full/ultra/wenyan |
 | **Security** | cybersecurity-risk | Security/privacy/abuse and trust-boundary risk assessment |
 | **Security** | agent-security-hardening | Agent workspace hardening, least privilege, and prompt/content safety |
 | **Security** | legal-compliance | Privacy/compliance risk spotting and escalation guidance |
@@ -239,17 +245,20 @@ Classify into a **role cluster** first, then choose the minimum skill set. This 
 | Nuxt app work | "Audit this Nuxt page" / "Build this in Nuxt" | nuxt-development, ui-ux-design-to-code |
 | API contract or webhook design | "Design this API" / "How should we version this?" | api-design, software-architecture |
 | CI/CD, containers, or infra | "Review our pipeline" / "Design deploy flow" | devops-iac, engineering-delivery, cybersecurity-risk |
+| Dockerfile or Docker Compose setup | "Dockerize this app" / "Make docker compose up -d work" | docker, devops-iac |
 | MongoDB schema or query work | "Review this collection design" / "Optimize this aggregation" | mongodb, data-architecture |
 | Browser automation or UI smoke tests | "Test this flow in the browser" / "Scrape this JS-rendered page" | browser-automation, integration-testing |
 | Performance profiling or bottleneck diagnosis | "Profile this slow endpoint" / "Find the memory leak" | performance-profiling, data-architecture |
 | Integration test design or contract testing | "Design the integration test layer" / "Set up CDC tests" | integration-testing, engineering-delivery |
 | Active incident or postmortem | "We have a P1" / "Run a blameless postmortem" | incident-response, bug-finding |
 | Schema, migration, or warehouse design | "Review this schema" / "Plan the migration" | data-architecture, software-architecture |
+| Design system or DESIGN.md | "Create a design system" / "Generate DESIGN.md" / "Audit design tokens" | design-systems, ui-ux-design-to-code |
 | UX/UI and accessibility | "Review for UX and accessibility" | ui-ux-design-to-code |
 | Localization or multilingual UX | "Audit i18n" / "Make this app localization-ready" | i18n-l10n, ui-ux-design-to-code |
 | 3D website or immersive motion | "Create a 3D web experience" | 3d-web-development, ui-ux-design-to-code |
 | GSAP or scroll-triggered motion | "Build this GSAP animation" / "Fix ScrollTrigger cleanup" | gsap-animation, ui-ux-design-to-code |
 | Lenis smooth scroll | "Add Lenis" / "Sync Lenis with GSAP ScrollTrigger" | lenis-smooth-scroll, gsap-animation |
+| Token-efficient or compressed responses | "less tokens" / "caveman mode" / "/caveman" | caveman |
 | Security/privacy/compliance review | "Audit abuse/privacy risks" / "Review compliance risk" | cybersecurity-risk, legal-compliance |
 | Find bugs or production root cause | "Hunt for bugs" / "Investigate logs and DB state" | bug-finding, business-logic-review |
 | Strict skeptical code review | "Review this PR harshly" / "Challenge this implementation" / "Check blast radius" | rigorous-code-review, coding-best-practices |
@@ -271,7 +280,7 @@ For larger efforts you can run the assistant in a phase-aware way. The assistant
 |-------|--------|-------------------|
 | **Discovery** | What we're building, for whom, evidence | project-understanding, customer-discovery, deep-research, product-strategy, market-analysis, competitor-intelligence, claude-code-setup |
 | **Strategy** | Roadmap, scope, priorities, ownership | planning-execution, operations, financial-modeling, investor-prep, software-architecture, api-design, data-architecture, analytics-metrics |
-| **Build** | Implementation with quality gates | engineering-delivery, rapid-prototype, github-workflow, mongodb, nuxt-development, browser-automation, devops-iac, ui-ux-design-to-code, i18n-l10n, 3d-web-development, gsap-animation, lenis-smooth-scroll, coding-best-practices, bug-finding, rigorous-code-review, performance-profiling, integration-testing, skill-creator |
+| **Build** | Implementation with quality gates | engineering-delivery, rapid-prototype, github-workflow, mongodb, nuxt-development, browser-automation, devops-iac, docker, ui-ux-design-to-code, design-systems, i18n-l10n, 3d-web-development, gsap-animation, lenis-smooth-scroll, coding-best-practices, bug-finding, rigorous-code-review, performance-profiling, integration-testing, skill-creator |
 | **Harden** | Security, logic, readiness | cybersecurity-risk, legal-compliance, business-logic-review, agent-security-hardening, incident-response, claude-md-management, cross-model-escalation |
 | **Launch** | Readiness, GTM, PMF signals | launch-commercialization, seo-geo, **Growth**: marketing-growth, growth-experiment, paid-acquisition-monetization, lead-intelligence; **Sales**: sales-strategy |
 
@@ -281,10 +290,10 @@ When the user says e.g. "We're in the build phase" or "Run the launch checklist"
 
 Use the right skill without the user having to ask, grouped by role cluster:
 
-- **Orchestration**: unfamiliar codebase -> `project-understanding`; current docs/API behavior -> `documentation-lookup`; deep evidence synthesis -> `deep-research`; new utility/dependency/integration -> `search-first`; new/evaluated skill -> `skill-creator`; skills/rules sprawl -> `skill-stocktake` or `rules-distill`; Claude instructions -> `claude-md-management`; Claude Code MCP/hooks/config -> `claude-code-setup`; current model stuck -> `cross-model-escalation`; post-meaningful durable lesson -> `continuous-learning`; heavy parallel/risky scope -> `subagent-delegation`.
+- **Orchestration**: unfamiliar codebase -> `project-understanding`; current docs/API behavior -> `documentation-lookup`; deep evidence synthesis -> `deep-research`; new utility/dependency/integration -> `search-first`; new/evaluated skill -> `skill-creator`; skills/rules sprawl -> `skill-stocktake` or `rules-distill`; Claude instructions -> `claude-md-management`; Claude Code MCP/hooks/config -> `claude-code-setup`; current model stuck -> `cross-model-escalation`; post-meaningful durable lesson -> `continuous-learning`; heavy parallel/risky scope -> `subagent-delegation`; token-efficient/compressed output requested -> `caveman`.
 - **Product**: customer research/interviews -> `customer-discovery`; roadmap/prioritization/owner or milestone drift -> `planning-execution`; vendor/process/change/capacity work -> `operations`; financial model/runway/pricing math -> `financial-modeling`; funnels/KPIs/experiments -> `analytics-metrics`; launch-readiness framing -> `launch-commercialization`.
-- **Engineering**: fast demo/POC -> `rapid-prototype`; complex implementation/refactor -> `engineering-delivery`; GitHub issues/PRs/Actions/releases -> `github-workflow`; browser testing/JS-rendered scraping -> `browser-automation`; CI/CD/container/infra changes -> `devops-iac`; MongoDB collection/query/migration work -> `mongodb`; Nuxt app work -> `nuxt-development`; schema/migration/warehouse/data pipeline work -> `data-architecture`; structural cleanup -> `code-revamp`; performance/bottleneck/profiling work -> `performance-profiling`; integration test layer or contract test design -> `integration-testing`; P1/P2 production incident or postmortem -> `incident-response`.
-- **Design**: UI quality/accessibility -> `ui-ux-design-to-code`; multilingual/locale/RTL risks -> `i18n-l10n`; 3D/WebGL/immersive experiences -> `3d-web-development`; GSAP timelines/ScrollTrigger motion -> `gsap-animation`; Lenis smooth-scroll plumbing -> `lenis-smooth-scroll`.
+- **Engineering**: fast demo/POC -> `rapid-prototype`; complex implementation/refactor -> `engineering-delivery`; GitHub issues/PRs/Actions/releases -> `github-workflow`; browser testing/JS-rendered scraping -> `browser-automation`; Dockerfile/Compose setup -> `docker`; CI/CD/container/infra changes -> `devops-iac`; MongoDB collection/query/migration work -> `mongodb`; Nuxt app work -> `nuxt-development`; schema/migration/warehouse/data pipeline work -> `data-architecture`; structural cleanup -> `code-revamp`; performance/bottleneck/profiling work -> `performance-profiling`; integration test layer or contract test design -> `integration-testing`; P1/P2 production incident or postmortem -> `incident-response`.
+- **Design**: design system creation/audit/token work -> `design-systems`; UI quality/accessibility -> `ui-ux-design-to-code`; multilingual/locale/RTL risks -> `i18n-l10n`; 3D/WebGL/immersive experiences -> `3d-web-development`; GSAP timelines/ScrollTrigger motion -> `gsap-animation`; Lenis smooth-scroll plumbing -> `lenis-smooth-scroll`.
 - **Security**: auth/billing/external API/input trust boundaries -> `cybersecurity-risk`; agent workspace/integration/memory safety -> `agent-security-hardening`; consent/retention/vendor/policy concerns -> `legal-compliance`.
 - **Quality**: code changed -> `rigorous-code-review` plus `bug-finding` as needed; strict skeptical review requested -> `rigorous-code-review`; incidents requiring DB/log/queue/webhook correlation -> `bug-finding` deep investigation mode with `business-logic-review` when invariants are involved.
 - **Architecture**: API/events/contracts -> `api-design` + `software-architecture`; major boundary/tradeoff changes -> `software-architecture`.
@@ -335,6 +344,7 @@ Before considering a meaningful task done:
 | `bosskuai-rapid-prototype` | `ai-assistant/skills/bosskuai-rapid-prototype/SKILL.md` |
 | `bosskuai-github-workflow` | `ai-assistant/skills/bosskuai-github-workflow/SKILL.md` |
 | `bosskuai-devops-iac` | `ai-assistant/skills/bosskuai-devops-iac/SKILL.md` |
+| `bosskuai-docker` | `ai-assistant/skills/bosskuai-docker/SKILL.md` |
 | `bosskuai-mongodb` | `ai-assistant/skills/bosskuai-mongodb/SKILL.md` |
 | `bosskuai-nuxt-development` | `ai-assistant/skills/bosskuai-nuxt-development/SKILL.md` |
 | `bosskuai-ui-ux-design-to-code` | `ai-assistant/skills/bosskuai-ui-ux-design-to-code/SKILL.md` |
@@ -342,6 +352,8 @@ Before considering a meaningful task done:
 | `bosskuai-3d-web-development` | `ai-assistant/skills/bosskuai-3d-web-development/SKILL.md` |
 | `bosskuai-gsap-animation` | `ai-assistant/skills/bosskuai-gsap-animation/SKILL.md` |
 | `bosskuai-lenis-smooth-scroll` | `ai-assistant/skills/bosskuai-lenis-smooth-scroll/SKILL.md` |
+| `bosskuai-design-systems` | `ai-assistant/skills/bosskuai-design-systems/SKILL.md` |
+| `bosskuai-caveman` | `ai-assistant/skills/bosskuai-caveman/SKILL.md` |
 | `bosskuai-cybersecurity-risk` | `ai-assistant/skills/bosskuai-cybersecurity-risk/SKILL.md` |
 | `bosskuai-agent-security-hardening` | `ai-assistant/skills/bosskuai-agent-security-hardening/SKILL.md` |
 | `bosskuai-legal-compliance` | `ai-assistant/skills/bosskuai-legal-compliance/SKILL.md` |
@@ -398,6 +410,7 @@ Deprecated alias skills (routing compatibility only):
 - If a design decision becomes an explicit rule, capture it in an ADR or equivalent decision record.
 - Use `ai-assistant/references/checklists/learning-promotion-checklist.md` to decide where a learning belongs.
 - Run `bash ./ai-assistant/scripts/learning-doctor.sh` periodically or before large maintenance passes to catch stale memory, contradictory counts, and consumed continuation state.
+- Use `bash ./ai-assistant/scripts/project-understanding.sh` when the repo itself changed enough that `project-understanding.md` should be refreshed from source.
 
 ### Post-task reporting (sparse)
 
@@ -418,11 +431,22 @@ Use the full debug block only in Debug/Handoff mode:
 
 ### Clarify first (ambiguity protocol)
 
-**When a prompt is general, ambiguous, or touches many files and you are not sure of the intended scope — stop and ask before acting.**
+**Mandatory gate:** When a prompt is general, ambiguous, or touches many files and intended scope is not explicit, the model MUST stop and ask before acting.
 
-- Ask using a numbered bullet list of yes/no (or short-answer) questions.
-- Include explicit answer format instructions so the user can reply concisely.
+- Treat ambiguity as a hard stop, not a soft suggestion.
+- Ask at most 3 numbered questions using yes/no or very short-answer choices.
+- Include one explicit reply format line so the user can answer concisely.
+- Wait for the user's answer before making multi-file changes, choosing between materially different scopes, or assuming defaults that could change the outcome.
 - Do NOT guess, assume, or start making changes across multiple files without confirmation.
+- If only one small clarification blocks the work, ask only that one question.
+- If the request is clear enough for a safe single-file or trivial action, proceed without unnecessary questions.
+
+Model behavior:
+1. Detect ambiguity or hidden scope branches.
+2. Pause before planning or editing.
+3. Ask 1-3 numbered scope questions.
+4. Include `Please answer: 1-... 2-...` format.
+5. Resume only after the user answers.
 
 Example format:
 ```
@@ -513,7 +537,7 @@ This agent should think like:
 
 ## References
 
-- **References by division** (checklists and playbooks per division): `ai-assistant/references/README.md`
+- **References by division**: use `ai-assistant/references/checklists/`, `ai-assistant/references/playbooks/`, `ai-assistant/references/pitfalls/`, and `ai-assistant/references/adr/`
 - Checklists: `ai-assistant/references/checklists/`
 - Playbooks: `ai-assistant/references/playbooks/`
 - Pitfalls: `ai-assistant/references/pitfalls/` (domain-specific lists + `general-known-pitfalls.md`)
@@ -522,3 +546,12 @@ This agent should think like:
 - Skill ↔ file reference integrity: run `./scripts/verify-skill-references.sh` from repo root
 - Session handoff: `ai-assistant/references/session-handoff-template.md`
 - Memory: `ai-assistant/memory/`
+
+
+<claude-mem-context>
+# Memory Context
+
+# $CMEM putra-saas 2026-04-15 11:39pm GMT+8
+
+No previous sessions found.
+</claude-mem-context>
