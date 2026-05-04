@@ -1,0 +1,59 @@
+<svg width="220" height="260" viewBox="0 0 220 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="body" x1="70" y1="30" x2="150" y2="210">
+      <stop stop-color="#EAFBFF"/>
+      <stop offset="0.45" stop-color="#8DEBFF"/>
+      <stop offset="1" stop-color="#2F8FB3"/>
+    </linearGradient>
+
+    <linearGradient id="glass" x1="83" y1="92" x2="137" y2="145">
+      <stop stop-color="#00E5FF"/>
+      <stop offset="1" stop-color="#004E73"/>
+    </linearGradient>
+
+    <linearGradient id="fin" x1="40" y1="155" x2="88" y2="230">
+      <stop stop-color="#B8F4FF"/>
+      <stop offset="1" stop-color="#2B6D8E"/>
+    </linearGradient>
+
+    <linearGradient id="flame" x1="110" y1="188" x2="110" y2="255">
+      <stop stop-color="#FFF176"/>
+      <stop offset="0.45" stop-color="#FF9800"/>
+      <stop offset="1" stop-color="#FF3D00"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#00384D" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <!-- Flame -->
+    <path d="M96 190C92 212 98 238 110 256C122 238 128 212 124 190H96Z" fill="url(#flame)"/>
+    <path d="M104 198C101 213 105 232 110 243C115 232 119 213 116 198H104Z" fill="#FFF9C4"/>
+
+    <!-- Left fin -->
+    <path d="M78 150C57 164 42 196 35 230C58 214 75 199 90 180L78 150Z" fill="url(#fin)"/>
+
+    <!-- Right fin -->
+    <path d="M142 150C163 164 178 196 185 230C162 214 145 199 130 180L142 150Z" fill="url(#fin)"/>
+
+    <!-- Rocket body -->
+    <path d="M110 10C72 45 58 98 66 160C70 190 88 208 110 208C132 208 150 190 154 160C162 98 148 45 110 10Z" fill="url(#body)"/>
+
+    <!-- Body highlight -->
+    <path d="M92 42C75 78 72 126 78 158C82 181 94 195 108 198C95 155 95 88 110 22C103 27 97 34 92 42Z" fill="white" opacity="0.35"/>
+
+    <!-- Window -->
+    <circle cx="110" cy="112" r="30" fill="#063B54"/>
+    <circle cx="110" cy="112" r="21" fill="url(#glass)"/>
+    <circle cx="102" cy="104" r="7" fill="#BDF7FF" opacity="0.8"/>
+
+    <!-- Nose glow -->
+    <path d="M110 10C96 23 85 40 77 61C96 52 124 52 143 61C135 40 124 23 110 10Z" fill="#D9FBFF" opacity="0.75"/>
+
+    <!-- Bottom engine -->
+    <rect x="88" y="178" width="44" height="28" rx="12" fill="#0A4F6A"/>
+    <rect x="97" y="184" width="26" height="12" rx="6" fill="#62DFFF"/>
+  </g>
+</svg>

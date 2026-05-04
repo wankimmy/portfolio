@@ -21,6 +21,8 @@ Use this skill when the goal is to **review** code (diffs, PRs, new modules, or 
 - Challenge: necessity, boundaries, error handling, security, observability, backwards compatibility, and rollout.
 - Prefer **strict** best practices in the form of **small, local improvements** that match existing project patterns.
 - **Major or cross-cutting changes** are reserved for clear triggers (repeated duplication across layers, wrong abstraction boundary, systemic security gap, unmaintainable coupling). State **why** a small fix is insufficient before recommending them.
+- Multi-perspective review: run separate passes for security, performance, correctness, and convention compliance rather than a single unstructured read.
+- Confidence scoring: assign each finding a 0–100 confidence score. Only block on findings above 80% confidence to reduce false positives and review noise.
 
 ## Severity scale
 
@@ -34,6 +36,13 @@ Use this skill when the goal is to **review** code (diffs, PRs, new modules, or 
 ## Workflow
 
 1. **Map context** — Identify how the change fits: directories, modules, public APIs, config, build/deploy (CI, env, migrations, feature flags), and runtime dependencies. Use `project-understanding` / `codebase-analysis` if the layout is unclear.
+
+   **Graph-aware acceleration (when `code-review-graph` MCP tools are available)**:
+   - Start with `get_minimal_context_tool(task="review changes", base=<base>)` to get graph stats, risk, and suggested next tools before broad file scanning.
+   - If the graph is missing or stale, run `build_or_update_graph_tool(postprocess="minimal")`; use `full_rebuild=True` only after branch switches, major refactors, or clearly corrupt graph state.
+   - Use `detect_changes_tool(base=<base>, detail_level="minimal")` as the first review pass. Escalate to `detail_level="standard"` or `get_review_context_tool(include_source=True, max_depth=2)` only for high-risk areas or unclear findings.
+   - For high-risk functions, query `query_graph_tool(pattern="callers_of", target=<symbol>)`, `query_graph_tool(pattern="tests_for", target=<symbol>)`, and `get_affected_flows_tool(base=<base>)` before deciding whether the blast radius is covered.
+   - Treat graph output as a triage map, not proof. Confirm every blocking finding by reading the diff, relevant source, and tests directly. If graph tools are unavailable, proceed with `git diff`, `rg`, call-site reads, and test inspection.
 
 2. **Read evidence** — Inspect the diff **and** call sites, tests, types/schemas, and infra touchpoints (Docker, k8s, serverless, pipelines) affected. Do not review the diff in isolation.
 
@@ -87,7 +96,9 @@ Use this skill when the goal is to **review** code (diffs, PRs, new modules, or 
    - Boilerplate that doesn't match the project's actual patterns
    - Inconsistent naming or style breaks within the same diff
 
-4. **Classify findings** — Assign each finding a severity label (P0–P3). Group by category if there are many.
+4. **Classify findings** — Assign each finding a severity label (P0–P3) and a confidence score (0–100). Group by category if there are many. Only post findings with confidence ≥ 80% by default.
+
+   **Optional MCP integration**: If CodeRabbit CLI is available, run `coderabbit:review` for AST-level static analysis (40+ analyzers). Merge its findings into your review with the same severity/confidence framework.
 
 5. **Recommend minimally** — For each issue, propose the **smallest** change that resolves it. If only a large refactor helps, label it **scope escalation**, give one concise rationale, and suggest **`bosskuai-code-revamp`** or a tracked follow-up — not a drive-by rewrite.
 
@@ -134,3 +145,4 @@ Non-goals: [what you are NOT refactoring and why]
 - `../../references/checklists/bug-finding-checklist.md`
 - `../../references/checklists/architecture-review-checklist.md`
 - `../../references/checklists/security-risk-checklist.md`
+- `../../references/playbooks/graph-aware-code-review-playbook.md`

@@ -1,5 +1,5 @@
 <template>
-  <section id="home" ref="heroRoot" class="hero" aria-labelledby="hero-heading">
+  <section id="home" ref="heroRoot" class="hero hero--cinematic hero--global-space-bg" aria-labelledby="hero-heading">
     <div class="hero__bg" aria-hidden="true">
       <div class="hero__galaxy"></div>
       <div class="hero__starfield">
@@ -21,20 +21,16 @@
       <div class="hero__glow"></div>
     </div>
 
-    <div class="hero__planet">
-      <Earth3D class="hero__planet-canvas" @ready="$emit('earth-ready')" @error="$emit('earth-error')" />
-    </div>
-
-    <div class="hero__inner">
-      <header class="hero__copy">
+    <div class="hero__inner hero__pin-target">
+      <header class="hero__copy hero__lift">
         <p class="hero__greeting">Hi, I'm Safwan Hakim</p>
-        <p class="hero__role">Software manager · Full-stack developer</p>
+        <p class="hero__role">Software Manager · Full-Stack Developer</p>
 
         <h1 id="hero-heading" class="hero__title">
           <span class="hero__title-line">I love exploring</span>
           <span class="hero__title-line hero__title-line--accent">new tech and ideas.</span>
         </h1>
-
+        <br>
         <div class="hero__actions">
           <a class="button button--primary" href="#projects">See work</a>
           <a class="button button--ghost" href="mailto:putrafyp@gmail.com">Contact me</a>
@@ -76,14 +72,16 @@
           </a>
         </nav>
       </header>
-    </div>
 
-    <a class="scroll-cue" href="#about" aria-label="Scroll to about section">
-      <span class="scroll-cue__mouse" aria-hidden="true">
-        <span class="scroll-cue__dot"></span>
-      </span>
-      <span class="scroll-cue__label">Scroll down</span>
-    </a>
+      <div class="hero__planet hero__scale">
+        <Earth3D
+          ref="earthRef"
+          class="hero__planet-canvas"
+          @ready="$emit('earth-ready')"
+          @error="$emit('earth-error')"
+        />
+      </div>
+    </div>
   </section>
 </template>
 
@@ -118,40 +116,95 @@ const buildHeroStars = (count) => {
 const heroStars = buildHeroStars(340)
 
 const heroRoot = ref(null)
+const earthRef = ref(null)
 let ctx
 
-onMounted(() => {
-  const root = heroRoot.value
-  if (!root) return
+let landingIntroRan = false
 
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+/** @param {{ instant?: boolean } | undefined} options */
+function startLandingReveal(options) {
+  const instant = Boolean(options?.instant)
+  const root = heroRoot.value
+  if (!root || landingIntroRan) {
     return
   }
+  landingIntroRan = true
+
+  ctx?.revert()
+
+  const reduceMotion =
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
   ctx = gsap.context(() => {
-    const timeline = gsap.timeline({ delay: 0.08 })
+    if (instant || reduceMotion) {
+      gsap.set(['.hero__galaxy', '.hero__starfield', '.hero__glow'], {
+        opacity: 1,
+        clearProps: 'opacity',
+      })
+      gsap.set(['.hero__copy', '.hero__social'], { opacity: 1, y: 0 })
+      gsap.set('.hero__planet', { opacity: 1, scale: 1 })
+      return
+    }
 
+    const timeline = gsap.timeline({ defaults: { ease: 'power3.out' } })
     timeline
-      .fromTo('.hero__galaxy', { opacity: 0 }, { opacity: 1, duration: 1.35, ease: 'power2.out' })
-      .fromTo('.hero__starfield', { opacity: 0 }, { opacity: 1, duration: 1.2, ease: 'power2.out' }, '-=1.15')
-      .fromTo('.hero__copy', { opacity: 0, y: 32 }, { opacity: 1, y: 0, duration: 0.9, ease: 'power3.out' }, '-=0.95')
+      .fromTo('.hero__galaxy', { opacity: 0 }, { opacity: 1, duration: 1.05, ease: 'power2.out' })
+      .fromTo('.hero__starfield', { opacity: 0 }, { opacity: 1, duration: 0.95, ease: 'power2.out' }, '-=0.95')
+      .fromTo(
+        '.hero__glow',
+        { opacity: 0.15 },
+        { opacity: 0.92, duration: 1 },
+        '-=1'
+      )
+      .fromTo('.hero__copy', { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 1 }, '-=0.78')
       .fromTo(
         '.hero__planet',
-        { opacity: 0, scale: 0.94 },
-        { opacity: 1, scale: 1, duration: 1.15, ease: 'power3.out' },
-        '-=0.75'
+        { opacity: 0, scale: 0.9 },
+        { opacity: 1, scale: 1, duration: 1.15, ease: 'power2.out' },
+        '-=0.85'
       )
       .fromTo(
         '.hero__social',
-        { opacity: 0, y: 14 },
-        { opacity: 1, y: 0, duration: 0.45, ease: 'power2.out' },
+        { opacity: 0, y: 16 },
+        { opacity: 1, y: 0, duration: 0.5 },
         '-=0.55'
       )
-      .fromTo('.scroll-cue', { opacity: 0 }, { opacity: 1, duration: 0.4, ease: 'power2.out' }, '-=0.35')
   }, root)
+}
+
+function primeLandingHidden() {
+  const root = heroRoot.value
+  if (!root) {
+    return
+  }
+  const reduceMotion =
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  ctx?.revert()
+  ctx = gsap.context(() => {
+    if (!reduceMotion) {
+      gsap.set(['.hero__galaxy', '.hero__starfield', '.hero__glow'], {
+        opacity: 0,
+      })
+      gsap.set(['.hero__copy', '.hero__social'], { opacity: 0, y: 36 })
+      gsap.set('.hero__planet', { opacity: 0, scale: 0.92 })
+    }
+  }, root)
+}
+
+onMounted(() => {
+  primeLandingHidden()
+})
+
+function setEarthCinematicProgress(progress) {
+  earthRef.value?.setCinematicProgress?.(progress)
+}
+
+defineExpose({
+  startLandingReveal,
+  setEarthCinematicProgress,
 })
 
 onBeforeUnmount(() => {
-  ctx?.revert()
+  ctx?.revert?.()
 })
 </script>

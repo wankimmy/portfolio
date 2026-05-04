@@ -7,7 +7,7 @@
       </div>
 
       <div class="experience-list">
-        <article v-for="job in experience" :key="job.period + job.company" class="experience-item tilt-card reveal">
+        <article v-for="job in experience" :key="job.period + job.company" class="experience-item tilt-card">
           <div class="experience-item__content">
             <div class="experience-item__meta">
               <span class="experience-item__period">{{ job.period }}</span>
@@ -31,7 +31,7 @@
 <script setup>
 const experience = [
   {
-    period: 'Apr 2020 - Present',
+    period: 'Apr 2020 - March 2026',
     title: 'Associate Software Manager',
     company: 'Fiuu',
     summary:

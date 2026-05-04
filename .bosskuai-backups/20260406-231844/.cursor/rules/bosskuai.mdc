@@ -1,0 +1,77 @@
+---
+alwaysApply: true
+---
+# BosskuAI Rules
+
+Apply these rules anywhere inside this repo.
+
+**Cross-reference:** Tool-neutral contract (full skill roster, memory, future skill gaps) is in root **`AGENTS.md`** — see § **Entry points and intentional overlap**. Expanded **Definition of Done** checklist is in **`CLAUDE.md`**.
+
+## Bossku activation keyword
+
+If the user includes the standalone word `bossku` anywhere in the prompt, treat that as an explicit request to activate BosskuAI mode for that request.
+
+- Apply the BosskuAI workspace rules before answering.
+- Classify the task and automatically load the minimum relevant local BosskuAI skills.
+- Do not require the user to name a specific skill after saying `bossku` unless scope is still ambiguous.
+
+## Model assignment (mandatory)
+
+**Two-phase model split — always enforced for meaningful tasks in Cursor:**
+
+| Phase | Model | Why |
+|-------|-------|-----|
+| Planning, architecture, strategy, analysis (Plan mode) | **Claude Opus 4.6**, **GPT-5.4**, or **Gemini Pro 3.1** (pick strongest available for the task) | Deepest reasoning for complex/ambiguous problems |
+| Implementation, execution, code generation | **Cursor Composer 2** (always) | Default execution surface; fast, tool-capable agent for concrete work |
+
+- Always enter **Plan mode** first with **Opus 4.6, GPT-5.4, or Gemini Pro 3.1** (whichever is available and best suited). Never skip to execution on meaningful tasks.
+- **Execution** (implementation, edits, codegen): always use **Composer 2**, not ad-hoc chat models.
+- Quick/trivial tasks (single-line fixes, factual lookups) may skip the split.
+
+## Shared memory (mandatory)
+
+- `ai-assistant/memory/` is shared durable memory across Claude, Codex, and Cursor.
+- Read relevant memory files at the start of every session before acting.
+- Write durable findings back to memory after meaningful tasks.
+- Never treat memory as tool-local — any insight written here must be usable by all tools.
+
+## Clarify first (ambiguity protocol)
+
+**When a prompt is general, ambiguous, or touches many files and you are unsure of the intended scope — stop and ask before acting.**
+
+- Ask a numbered bullet list of yes/no (or short-answer) questions.
+- Include explicit answer format so the user can reply concisely (e.g. `1-yes 2-no 3-A`).
+- Do NOT guess, assume, or make changes across multiple files without confirmation.
+
+## Core rules
+
+> Full skill roster, task-type list, and working rules are in root **`AGENTS.md`**. Rules here are Cursor-specific additions only — do not duplicate `AGENTS.md` content.
+
+- Identify task type using **AGENTS.md → Skill roster** before acting.
+- If the user says `bossku`, treat that as activation for the whole BosskuAI system in this workspace before task routing.
+- Load only the relevant skills — never load every expert surface.
+- Always plan first in **Plan mode** (Opus 4.6 / GPT-5.4 / Gemini Pro 3.1). State phase and model at the start of each meaningful task.
+- Execute in **Composer 2** only — not ad-hoc chat. Never skip to Composer 2 before Plan mode outcome is stated.
+- If repo or product context is unclear, use `bosskuai-project-understanding` first.
+- Read source code before making architecture or bug claims.
+- Prefer the smallest safe change. Use code revamp only when the structure materially blocks delivery.
+- Triple-check important work. Be skeptical; push for clearer acceptance criteria.
+- Treat security, UX, business rules, and operational risk as part of correctness.
+- Treat `ai-assistant/memory/` as shared durable memory across all tools.
+- After meaningful tasks, promote durable learnings to memory, checklist, pitfall, playbook, or skill.
+- If continuation risk is high, preserve compact handoff state; ask user to continue in a fresh prompt.
+- When a task has ≥ 2 independent workstreams or ≥ 5 independent files: open parallel Composer tabs — one per workstream, each scoped to its own files and goal. Do not run sequentially in one Composer unless there is an ordering dependency.
+- If something material is unconfirmed, ask the user instead of guessing.
+- Run `bash ./ai-assistant/scripts/learning-doctor.sh` before large maintenance passes.
+
+## References
+
+- Root instructions: [AGENTS.md](mdc:AGENTS.md)
+- Claude entry + full DoD: [CLAUDE.md](mdc:CLAUDE.md)
+- Assistant knowledge: [`ai-assistant/`](mdc:ai-assistant)
+- Continuous-learning skill: [`ai-assistant/skills/bosskuai-continuous-learning/SKILL.md`](mdc:ai-assistant/skills/bosskuai-continuous-learning/SKILL.md)
+- Checklists: [`ai-assistant/references/checklists/`](mdc:ai-assistant/references/checklists)
+- Playbooks: [`ai-assistant/references/playbooks/`](mdc:ai-assistant/references/playbooks)
+- Session handoff: [`ai-assistant/references/session-handoff-template.md`](mdc:ai-assistant/references/session-handoff-template.md)
+- Agent profile: [`ai-assistant/memory/agent-profile.md`](mdc:ai-assistant/memory/agent-profile.md)
+- Project understanding memory: [`ai-assistant/memory/project-understanding.md`](mdc:ai-assistant/memory/project-understanding.md)

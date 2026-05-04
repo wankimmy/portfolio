@@ -11,7 +11,6 @@
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue'
 
-const emit = defineEmits(['ready', 'error'])
 import * as THREE from 'three/webgpu'
 import {
   bumpMap,
@@ -30,6 +29,8 @@ import {
   vec4,
 } from 'three/webgpu'
 
+const emit = defineEmits(['ready', 'error'])
+
 const containerRef = ref(null)
 
 const TEXTURE_BASE = '/textures/planets/'
@@ -40,6 +41,8 @@ let renderer
 let frameId
 let resizeObserver
 let rootGroup
+/** Extra roll / dolly applied from scroll choreography (damped each frame) */
+let cinematicGroup
 let earthMesh
 let atmosphereMesh
 let stars
@@ -55,6 +58,11 @@ const MAX_TILT_X = 0.52
 /** Radians per second — slow idle spin when not dragging */
 const AUTO_SPIN_SPEED = 0.09
 
+const BASE_CAMERA_Z = 5.05
+/** 0–1 scroll-driven cinematic offset (target) */
+let cinematicTarget = 0
+let cinematicSmooth = 0
+
 /** Port of three.js webgpu_tsl_earth (r170): TSL day/night, clouds, atmosphere — adapted for hero layout. */
 const makeStarField = () => {
   const geometry = new THREE.BufferGeometry()
@@ -68,7 +76,7 @@ const makeStarField = () => {
     positions.push(
       radius * Math.sin(phi) * Math.cos(theta),
       radius * Math.sin(phi) * Math.sin(theta),
-      radius * Math.cos(phi)
+      radius * Math.cos(phi),
     )
   }
 
@@ -136,8 +144,11 @@ const buildEarth = (dayTexture, nightTexture, bumpRoughnessCloudsTexture, sunDir
   spinGroup.add(earthMesh)
   spinGroup.add(atmosphereMesh)
 
+  cinematicGroup = new THREE.Group()
+  cinematicGroup.add(spinGroup)
+
   rootGroup = new THREE.Group()
-  rootGroup.add(spinGroup)
+  rootGroup.add(cinematicGroup)
   scene.add(rootGroup)
 }
 
@@ -151,7 +162,7 @@ const initScene = async () => {
 
   scene = new THREE.Scene()
   camera = new THREE.PerspectiveCamera(35, width / height, 0.1, 100)
-  camera.position.set(0, 0.1, 5.05)
+  camera.position.set(0, 0.1, BASE_CAMERA_Z)
 
   renderer = new THREE.WebGPURenderer({ antialias: true, alpha: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -183,7 +194,7 @@ const initScene = async () => {
           resolve(tex)
         },
         undefined,
-        reject
+        reject,
       )
     })
 
@@ -220,6 +231,18 @@ const animate = () => {
   }
 
   const delta = clock.getDelta()
+
+  cinematicSmooth = THREE.MathUtils.damp(cinematicSmooth, cinematicTarget, 5.2, delta)
+
+  if (cinematicGroup) {
+    const k = cinematicSmooth
+    cinematicGroup.rotation.y = k * -0.42
+    cinematicGroup.rotation.x = k * 0.09
+    cinematicGroup.position.z = k * -0.45
+  }
+
+  camera.position.z = BASE_CAMERA_Z - cinematicSmooth * 0.65
+
   if (!isDragging) {
     spinGroup.rotation.y += delta * AUTO_SPIN_SPEED
   }
@@ -330,6 +353,7 @@ const cleanup = () => {
 
   stars = null
   rootGroup = null
+  cinematicGroup = null
   spinGroup = null
   earthMesh = null
   atmosphereMesh = null
@@ -349,6 +373,22 @@ const cleanup = () => {
   renderer = null
 }
 
+/**
+ * Drive hero earth from scroll (0 = default hero pose, 1 = full “arrival” push-in).
+ * @param {number} value
+ */
+const setCinematicProgress = (value) => {
+  const v = Number(value)
+  if (!Number.isFinite(v)) {
+    return
+  }
+  cinematicTarget = Math.min(1, Math.max(0, v))
+}
+
+defineExpose({
+  setCinematicProgress,
+})
+
 onMounted(async () => {
   try {
     await initScene()
@@ -367,7 +407,6 @@ onMounted(async () => {
 
   animate()
 
-  // Wait for the next two frames so the first WebGPU frame has been presented.
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       emit('ready')
@@ -382,7 +421,7 @@ onUnmounted(cleanup)
 .earth-container {
   position: relative;
   display: block;
-  width: min(580px, 100%);
+  width: min(720px, 100%);
   aspect-ratio: 1;
   isolation: isolate;
   cursor: grab;

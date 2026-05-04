@@ -9,6 +9,7 @@ Use this skill for **screens, flows, and implementation-ready UI guidance** — 
 
 ## How this differs from nearby skills
 
+- **`bosskuai-design-systems`**: handles the system-level foundation (tokens, DESIGN.md, component specs); load that skill when creating or auditing a design system. This skill uses the design system as input for screen-level work.
 - **`bosskuai-3d-web-development`**: immersive 3D WebGL experiences; load instead of this skill when the work is Three.js/R3F/Spline.
 - **`bosskuai-engineering-delivery`**: the full implementation workflow; this skill handles the UI design-to-code translation step within that workflow.
 - **`bosskuai-coding-best-practices`**: general code quality; this skill handles the design, UX, and component-pattern decisions specifically.
@@ -19,6 +20,8 @@ Use this skill for **screens, flows, and implementation-ready UI guidance** — 
 - Mobile-first: design and review for the smallest screen first, then enhance.
 - States are as important as the happy path — loading, empty, error, and partial-data states all need design decisions.
 - Accessibility is not optional — it is part of implementation correctness.
+- Anti-generic-AI aesthetics: if it looks like every other AI-generated landing page, redesign it. Reject generic system fonts, predictable purple gradients, and cookie-cutter layouts.
+- Distinctive design: intentional typography pairings, orchestrated motion, asymmetric spatial composition, and visual depth through gradients, textures, and layered effects.
 
 ## UX review lenses (Nielsen's heuristics — apply selectively)
 
@@ -36,6 +39,8 @@ Use this skill for **screens, flows, and implementation-ready UI guidance** — 
 ## Workflow
 
 1. **Identify the user's goal on this screen** — Not the product's goal, the user's goal. What are they trying to accomplish and what is the success state?
+
+1b. **Check for a project DESIGN.md** — If one exists in the project root, load it and use its tokens, components, and rules as the baseline for all critique and handoff. If none exists, note this gap and recommend creating one via `bosskuai-design-systems`.
 
 2. **Break the interface into a component hierarchy**:
    - Layout containers (page, section, card, modal)
@@ -75,7 +80,13 @@ Use this skill for **screens, flows, and implementation-ready UI guidance** — 
    - Interaction rules (hover, focus, active, disabled behaviors)
    - Animation notes (entrance, exit, transition — duration, easing, trigger)
 
-7. **Call out ambiguity** — Do not invent silent design decisions. Flag: "This mockup doesn't show the empty state — define it before building."
+7. **Design critique** — Evaluate mockups for usability issues, design system consistency, and visual distinctiveness. Flag generic or derivative designs.
+
+8. **UX writing** — Craft microcopy for UI elements: button labels, error messages, empty states, tooltips, confirmation dialogs, and onboarding copy. Voice and tone should match the product personality.
+
+9. **Accessibility audit** — Beyond the WCAG checks in step 5, run a structured audit: color contrast, keyboard navigation, screen reader flow, focus management, motion preferences, and form labeling. Use WCAG 2.1 AA as the minimum bar.
+
+10. **Call out ambiguity** — Do not invent silent design decisions. Flag: "This mockup doesn't show the empty state — define it before building."
 
 ## Guardrails
 

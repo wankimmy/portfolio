@@ -10,7 +10,7 @@
         <article
           v-for="project in allProjects"
           :key="project.name"
-          class="project-card tilt-card reveal"
+          class="project-card depth-reveal tilt-card"
           :class="{ 'project-card--featured': project.featured }"
           :style="{ '--project-glow': project.glow }"
         >

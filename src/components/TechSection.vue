@@ -10,12 +10,14 @@
       </div>
 
       <div class="tech-grid">
-        <article v-for="group in techGroups" :key="group.title" class="tech-card tilt-card reveal">
-          <h3 class="tech-card__heading">{{ group.title }}</h3>
-          <div class="tech-card__chips">
-            <span v-for="item in group.items" :key="item">{{ item }}</span>
-          </div>
-        </article>
+        <div v-for="group in techGroups" :key="group.title" class="tech-grid__item">
+          <article class="tech-card tilt-card">
+            <h3 class="tech-card__heading">{{ group.title }}</h3>
+            <div class="tech-card__chips">
+              <span v-for="item in group.items" :key="item">{{ item }}</span>
+            </div>
+          </article>
+        </div>
       </div>
     </div>
   </section>

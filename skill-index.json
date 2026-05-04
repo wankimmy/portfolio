@@ -1,0 +1,527 @@
+{
+  "version": "1.4.0",
+  "generated_from": [
+    "AGENTS.md",
+    "ai-assistant/references/workspace-layer-architecture.md"
+  ],
+  "routing": {
+    "activation_keyword": "bossku",
+    "activation_match": "standalone_case_insensitive_word",
+    "max_primary_skills": 1,
+    "max_secondary_skills": 1,
+    "default_skill_id": "bosskuai-workspace-assistant",
+    "no_specialist_min_score": 1.2,
+    "ambiguity_margin": 1.2,
+    "core_skill_ids": [
+      "bosskuai-workspace-assistant",
+      "bosskuai-project-understanding",
+      "bosskuai-search-first",
+      "bosskuai-engineering-delivery",
+      "bosskuai-rigorous-code-review",
+      "bosskuai-documentation-lookup",
+      "bosskuai-continuous-learning",
+      "bosskuai-context-limit-continuation"
+    ],
+    "manual_only_skill_ids": [
+      "cofounder",
+      "bosskuai-caveman",
+      "bosskuai-3d-web-development",
+      "bosskuai-gsap-animation",
+      "bosskuai-lenis-smooth-scroll",
+      "bosskuai-browser-automation",
+      "bosskuai-nuxt-development",
+      "bosskuai-mongodb",
+      "bosskuai-claude-code-setup",
+      "bosskuai-claude-md-management",
+      "bosskuai-investor-prep",
+      "bosskuai-financial-modeling",
+      "bosskuai-lead-intelligence"
+    ],
+    "archived_alias_skill_ids": [
+      "bosskuai-root-cause-investigation",
+      "bosskuai-project-management",
+      "bosskuai-social-content-calendar"
+    ],
+    "specialist_policy": "Load specialist skills only when the user request or repo evidence clearly requires them.",
+    "manual_only_policy": "Manual-only specialists should activate only from explicit wording or strong domain evidence, not from vague overlap.",
+    "alias_policy": "Deprecated alias skills remain for compatibility and should route to their replacement skill.",
+    "evaluation_note": "Routing benchmarks are task-fit and workflow proxies, not guarantees of answer accuracy.",
+    "clusters": [
+      "orchestration",
+      "product",
+      "engineering",
+      "design",
+      "security",
+      "quality",
+      "architecture",
+      "growth",
+      "startup",
+      "research",
+      "continuation"
+    ]
+  },
+  "skills": [
+    {
+      "id": "cofounder",
+      "cluster": "orchestration",
+      "status": "active",
+      "triggers": ["cofounder mode", "founder sparring", "what should we do next"],
+      "keywords": ["cofounder", "startup tradeoff", "prioritization", "next move", "founder mode"]
+    },
+    {
+      "id": "bosskuai-workspace-assistant",
+      "cluster": "orchestration",
+      "status": "active",
+      "triggers": ["cross-cutting", "route task", "unclear domain"],
+      "keywords": ["orchestrate", "classify", "router", "meta"]
+    },
+    {
+      "id": "bosskuai-project-understanding",
+      "cluster": "orchestration",
+      "status": "active",
+      "triggers": ["new repo", "unclear context"],
+      "keywords": ["understand codebase", "architecture map", "source of truth"]
+    },
+    {
+      "id": "bosskuai-search-first",
+      "cluster": "orchestration",
+      "status": "active",
+      "triggers": ["adopt vs build", "check existing options"],
+      "keywords": ["existing solution", "library choice", "maintained option"]
+    },
+    {
+      "id": "bosskuai-skill-stocktake",
+      "cluster": "orchestration",
+      "status": "active",
+      "triggers": ["audit skills", "skill overlap", "maintenance pass"],
+      "keywords": ["skill audit", "stale guidance", "overlap"]
+    },
+    {
+      "id": "bosskuai-rules-distill",
+      "cluster": "orchestration",
+      "status": "active",
+      "triggers": ["promote rules", "rule cleanup"],
+      "keywords": ["distill rules", "shared guidance", "policy update"]
+    },
+    {
+      "id": "bosskuai-continuous-learning",
+      "cluster": "orchestration",
+      "status": "active",
+      "triggers": ["capture learnings", "promote lessons"],
+      "keywords": ["memory promotion", "playbook update", "pitfall capture"]
+    },
+    {
+      "id": "bosskuai-subagent-delegation",
+      "cluster": "orchestration",
+      "status": "active",
+      "triggers": ["parallelize", "multi-workstream", "risky scope"],
+      "keywords": ["delegate", "subagents", "worktree"]
+    },
+    {
+      "id": "bosskuai-product-strategy",
+      "cluster": "product",
+      "status": "active",
+      "triggers": ["shape spec", "scope feature"],
+      "keywords": ["product strategy", "prioritization", "requirements"]
+    },
+    {
+      "id": "bosskuai-analytics-metrics",
+      "cluster": "product",
+      "status": "active",
+      "triggers": ["design metrics", "instrument funnel"],
+      "keywords": ["KPI", "analytics", "experiments", "funnel"]
+    },
+    {
+      "id": "bosskuai-planning-execution",
+      "cluster": "product",
+      "status": "active",
+      "triggers": ["roadmap", "milestones", "owners", "execution tracking"],
+      "keywords": ["planning", "delivery management", "dependencies", "RACI"]
+    },
+    {
+      "id": "bosskuai-launch-commercialization",
+      "cluster": "product",
+      "status": "active",
+      "triggers": ["launch readiness", "go to market launch"],
+      "keywords": ["launch plan", "PMF", "readiness", "commercialization"]
+    },
+    {
+      "id": "bosskuai-engineering-delivery",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["implement feature", "code changes"],
+      "keywords": ["implementation", "test guided", "verification"]
+    },
+    {
+      "id": "bosskuai-devops-iac",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["CI/CD", "infrastructure", "deployment"],
+      "keywords": ["terraform", "docker", "pipeline", "runtime"]
+    },
+    {
+      "id": "bosskuai-docker",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["dockerize app", "Dockerfile", "Docker Compose", "docker compose up"],
+      "keywords": ["docker", "compose.yaml", "Dockerfile", ".env", "volumes", "networks", "secrets", "bind mount"]
+    },
+    {
+      "id": "bosskuai-codebase-analysis",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["trace execution path", "understand module boundaries"],
+      "keywords": ["code reading", "entry points", "side effects"]
+    },
+    {
+      "id": "bosskuai-code-revamp",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["modernize legacy", "structural cleanup"],
+      "keywords": ["refactor", "revamp", "minimal churn"]
+    },
+    {
+      "id": "bosskuai-coding-best-practices",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["quality uplift", "best practices pass"],
+      "keywords": ["maintainability", "naming", "error handling", "tests"]
+    },
+    {
+      "id": "bosskuai-polyglot-engineering",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["cross-language guidance", "stack tradeoffs"],
+      "keywords": ["polyglot", "framework choice", "runtime tradeoff"]
+    },
+    {
+      "id": "bosskuai-ui-ux-design-to-code",
+      "cluster": "design",
+      "status": "active",
+      "triggers": ["UI review", "design to code"],
+      "keywords": ["UX", "accessibility", "interaction design", "design system"]
+    },
+    {
+      "id": "bosskuai-i18n-l10n",
+      "cluster": "design",
+      "status": "active",
+      "triggers": ["localization", "multi-language", "RTL"],
+      "keywords": ["i18n", "l10n", "locale", "translation"]
+    },
+    {
+      "id": "bosskuai-3d-web-development",
+      "cluster": "design",
+      "status": "active",
+      "triggers": ["3D website", "WebGL", "Three.js"],
+      "keywords": ["R3F", "shader", "immersive", "Awwwards"]
+    },
+    {
+      "id": "bosskuai-gsap-animation",
+      "cluster": "design",
+      "status": "active",
+      "triggers": ["GSAP animation", "ScrollTrigger", "scroll-triggered motion", "timeline animation"],
+      "keywords": ["gsap", "ScrollTrigger", "timeline", "matchMedia", "useGSAP", "SplitText", "Flip"]
+    },
+    {
+      "id": "bosskuai-lenis-smooth-scroll",
+      "cluster": "design",
+      "status": "active",
+      "triggers": ["Lenis smooth scroll", "smooth scrolling", "GSAP Lenis sync", "scroll snap"],
+      "keywords": ["lenis", "smooth scroll", "autoRaf", "ReactLenis", "VueLenis", "lenis/snap", "anchors"]
+    },
+    {
+      "id": "bosskuai-design-systems",
+      "cluster": "design",
+      "status": "active",
+      "triggers": ["create design system", "generate DESIGN.md", "design tokens", "design system audit", "brand design system"],
+      "keywords": ["design system", "DESIGN.md", "tokens", "color palette", "typography scale", "component specs", "brand system", "getdesign.md"]
+    },
+    {
+      "id": "bosskuai-caveman",
+      "cluster": "orchestration",
+      "status": "active",
+      "triggers": ["compress responses", "less tokens", "caveman mode", "token efficient", "be brief"],
+      "keywords": ["caveman", "compressed responses", "token reduction", "terse output", "intensity", "wenyan"]
+    },
+    {
+      "id": "bosskuai-cybersecurity-risk",
+      "cluster": "security",
+      "status": "active",
+      "triggers": ["security review", "abuse risk"],
+      "keywords": ["auth", "privacy", "threat model", "trust boundary"]
+    },
+    {
+      "id": "bosskuai-agent-security-hardening",
+      "cluster": "security",
+      "status": "active",
+      "triggers": ["agent workspace hardening", "prompt injection risk"],
+      "keywords": ["least privilege", "MCP risk", "memory poisoning"]
+    },
+    {
+      "id": "bosskuai-legal-compliance",
+      "cluster": "security",
+      "status": "active",
+      "triggers": ["compliance posture", "privacy policy obligations"],
+      "keywords": ["consent", "retention", "vendor obligations", "policy"]
+    },
+    {
+      "id": "bosskuai-business-logic-review",
+      "cluster": "quality",
+      "status": "active",
+      "triggers": ["workflow correctness", "state transitions"],
+      "keywords": ["invariants", "approval flow", "edge cases"]
+    },
+    {
+      "id": "bosskuai-bug-finding",
+      "cluster": "quality",
+      "status": "active",
+      "triggers": ["bug hunt", "regression", "incident root cause"],
+      "keywords": ["defect", "failure path", "logs", "DB state", "queues", "webhooks"]
+    },
+    {
+      "id": "bosskuai-rigorous-code-review",
+      "cluster": "quality",
+      "status": "active",
+      "triggers": ["strict PR review", "skeptical review", "blast-radius review"],
+      "keywords": ["adversarial review", "minimal churn", "risk-first", "code-review-graph", "callers", "test gaps"]
+    },
+    {
+      "id": "bosskuai-software-architecture",
+      "cluster": "architecture",
+      "status": "active",
+      "triggers": ["architecture decision", "system boundaries"],
+      "keywords": ["layering", "tradeoffs", "scalability", "integration"]
+    },
+    {
+      "id": "bosskuai-api-design",
+      "cluster": "architecture",
+      "status": "active",
+      "triggers": ["design API contract", "webhook/event contract"],
+      "keywords": ["versioning", "pagination", "idempotency", "error model"]
+    },
+    {
+      "id": "bosskuai-data-architecture",
+      "cluster": "architecture",
+      "status": "active",
+      "triggers": ["schema design", "migration plan", "warehouse pipeline"],
+      "keywords": ["data model", "retention", "analytics pipeline"]
+    },
+    {
+      "id": "bosskuai-market-analysis",
+      "cluster": "growth",
+      "status": "active",
+      "triggers": ["market research", "competitor analysis"],
+      "keywords": ["positioning", "pricing signals", "opportunity analysis"]
+    },
+    {
+      "id": "bosskuai-marketing-growth",
+      "cluster": "growth",
+      "status": "active",
+      "triggers": ["GTM strategy", "channel strategy", "social content calendar"],
+      "keywords": ["messaging", "distribution", "growth loops", "content calendar"]
+    },
+    {
+      "id": "bosskuai-paid-acquisition-monetization",
+      "cluster": "growth",
+      "status": "active",
+      "triggers": ["paid ads plan", "CAC plan", "pricing/monetization"],
+      "keywords": ["Google Ads", "paid media", "LTV", "packaging"]
+    },
+    {
+      "id": "bosskuai-seo-geo",
+      "cluster": "growth",
+      "status": "active",
+      "triggers": ["SEO strategy", "GEO strategy"],
+      "keywords": ["discoverability", "search intent", "answerability"]
+    },
+    {
+      "id": "bosskuai-sales-strategy",
+      "cluster": "growth",
+      "status": "active",
+      "triggers": ["sales motion", "ICP and objections"],
+      "keywords": ["pipeline", "qualification", "conversion", "pricing narrative"]
+    },
+    {
+      "id": "bosskuai-context-limit-continuation",
+      "cluster": "continuation",
+      "status": "active",
+      "triggers": ["context near limit", "handoff needed"],
+      "keywords": ["continuation", "handoff", "active-continuation"]
+    },
+    {
+      "id": "bosskuai-ai-model-selection",
+      "cluster": "continuation",
+      "status": "active",
+      "triggers": ["which model", "model recommendation"],
+      "keywords": ["capability", "latency", "cost", "modality", "reliability"]
+    },
+    {
+      "id": "bosskuai-deep-research",
+      "cluster": "research",
+      "status": "active",
+      "triggers": ["deep research", "multi-source investigation", "market research deep dive"],
+      "keywords": ["Exa", "Firecrawl", "web research", "cited findings", "source synthesis"]
+    },
+    {
+      "id": "bosskuai-browser-automation",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["browser automation", "playwright", "UI smoke test", "visual regression", "scrape page"],
+      "keywords": ["Playwright", "Pencil", "screenshot", "e2e", "QA automation"]
+    },
+    {
+      "id": "bosskuai-competitor-intelligence",
+      "cluster": "growth",
+      "status": "active",
+      "triggers": ["competitor monitoring", "competitor tracking", "competitive landscape update"],
+      "keywords": ["competitor matrix", "pricing signals", "hiring signals", "feature comparison"]
+    },
+    {
+      "id": "bosskuai-investor-prep",
+      "cluster": "startup",
+      "status": "active",
+      "triggers": ["investor prep", "pitch deck", "fundraising materials", "investor memo"],
+      "keywords": ["pitch", "deck", "memo", "fundraising", "due diligence", "ask"]
+    },
+    {
+      "id": "bosskuai-customer-discovery",
+      "cluster": "product",
+      "status": "active",
+      "triggers": ["user interviews", "customer discovery", "JTBD", "persona building"],
+      "keywords": ["interview guide", "jobs to be done", "persona", "pain tagging", "synthesis"]
+    },
+    {
+      "id": "bosskuai-financial-modeling",
+      "cluster": "startup",
+      "status": "active",
+      "triggers": ["financial model", "runway calculation", "unit economics", "revenue projections"],
+      "keywords": ["MRR", "churn", "CAC", "LTV", "burn rate", "runway", "scenarios"]
+    },
+    {
+      "id": "bosskuai-growth-experiment",
+      "cluster": "growth",
+      "status": "active",
+      "triggers": ["A/B test", "growth experiment", "experiment design", "growth hypothesis"],
+      "keywords": ["hypothesis", "sample size", "MDE", "statistical significance", "guardrail metrics"]
+    },
+    {
+      "id": "bosskuai-rapid-prototype",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["rapid prototype", "POC", "hackathon build", "MVP timebox"],
+      "keywords": ["timebox", "debt ledger", "hard-scope", "demo-ready", "shortcuts"]
+    },
+    {
+      "id": "bosskuai-documentation-lookup",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["docs lookup", "framework API", "library documentation", "how do I use X in Y"],
+      "keywords": ["Context7", "MCP docs", "live docs", "API reference", "version-specific"]
+    },
+    {
+      "id": "bosskuai-lead-intelligence",
+      "cluster": "growth",
+      "status": "active",
+      "triggers": ["find leads", "prospect list", "investor list", "lead scoring", "outreach draft"],
+      "keywords": ["ICP", "lead discovery", "Exa search", "warm path", "personalized outreach"]
+    },
+    {
+      "id": "bosskuai-nuxt-development",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["nuxt development", "nuxt audit", "nuxt best practices", "vue/nuxt project"],
+      "keywords": ["Nuxt", "Vue", "SSR", "Nitro", "useFetch", "auto-imports", "file-based routing", "nuxt.config"]
+    },
+    {
+      "id": "bosskuai-claude-code-setup",
+      "cluster": "orchestration",
+      "status": "active",
+      "triggers": ["Claude Code setup", "CLAUDE.md setup", "MCP config", "hooks config", "Claude Code onboarding"],
+      "keywords": ["CLAUDE.md", "MCP", "hooks", "commands", "permissions", "Claude Code"]
+    },
+    {
+      "id": "bosskuai-claude-md-management",
+      "cluster": "orchestration",
+      "status": "active",
+      "triggers": ["audit CLAUDE.md", "improve Claude instructions", "rule cleanup", "Claude rule drift"],
+      "keywords": ["CLAUDE.md", "rules", "instruction hygiene", "claude rule", "overlap control"]
+    },
+    {
+      "id": "bosskuai-cross-model-escalation",
+      "cluster": "orchestration",
+      "status": "active",
+      "triggers": ["model stuck", "low confidence", "escalate to another model", "thrashing"],
+      "keywords": ["escalation", "model switch", "blocked", "second opinion", "helper model"]
+    },
+    {
+      "id": "bosskuai-github-workflow",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["GitHub issues", "pull request", "GitHub Actions", "releases", "Dependabot"],
+      "keywords": ["PR", "issues", "Actions", "releases", "repo metadata", "GitHub MCP"]
+    },
+    {
+      "id": "bosskuai-incident-response",
+      "cluster": "quality",
+      "status": "active",
+      "triggers": ["production incident", "system down", "incident triage", "postmortem"],
+      "keywords": ["severity", "escalation", "on-call", "timeline", "blameless postmortem"]
+    },
+    {
+      "id": "bosskuai-integration-testing",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["integration test design", "contract testing", "CDC", "Pact", "test seams"],
+      "keywords": ["contract test", "test doubles", "fixtures", "provider", "consumer", "Pact"]
+    },
+    {
+      "id": "bosskuai-mongodb",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["MongoDB design", "MongoDB index", "aggregation pipeline", "MongoDB migration", "Atlas"],
+      "keywords": ["MongoDB", "collection", "index", "aggregation", "Atlas", "schema validation"]
+    },
+    {
+      "id": "bosskuai-operations",
+      "cluster": "product",
+      "status": "active",
+      "triggers": ["business operations", "vendor management", "SOPs", "RACI", "operating cadence"],
+      "keywords": ["SOP", "RACI", "vendor", "capacity planning", "change management", "process docs"]
+    },
+    {
+      "id": "bosskuai-performance-profiling",
+      "cluster": "engineering",
+      "status": "active",
+      "triggers": ["performance profiling", "bottleneck diagnosis", "why is this slow", "flame graph", "memory growth"],
+      "keywords": ["profiler", "flame graph", "CPU", "memory", "query optimization", "caching"]
+    },
+    {
+      "id": "bosskuai-skill-creator",
+      "cluster": "orchestration",
+      "status": "active",
+      "triggers": ["create skill", "improve skill", "skill quality audit", "benchmark skill", "new bosskuai skill"],
+      "keywords": ["skill design", "frontmatter", "SKILL.md", "validation prompt", "skill scope"]
+    },
+    {
+      "id": "bosskuai-root-cause-investigation",
+      "cluster": "quality",
+      "status": "deprecated_alias",
+      "replaced_by": "bosskuai-bug-finding",
+      "triggers": ["root cause investigation", "incident investigation"]
+    },
+    {
+      "id": "bosskuai-project-management",
+      "cluster": "product",
+      "status": "deprecated_alias",
+      "replaced_by": "bosskuai-planning-execution",
+      "triggers": ["project management", "delivery tracking"]
+    },
+    {
+      "id": "bosskuai-social-content-calendar",
+      "cluster": "growth",
+      "status": "deprecated_alias",
+      "replaced_by": "bosskuai-marketing-growth",
+      "triggers": ["content calendar", "social posting schedule"]
+    }
+  ]
+}

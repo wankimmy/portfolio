@@ -19,21 +19,8 @@
           </p>
         </article>
 
-        <figure class="about-profile about-layout__photo">
-          <div class="about-profile__media about-profile__media--portrait">
-            <img
-              src="/images/safwan-potrait.png"
-              alt="Portrait of Safwan Hakim"
-              width="800"
-              height="1200"
-              loading="lazy"
-              decoding="async"
-            />
-          </div>
-        </figure>
-
         <aside class="about-stack about-layout__aside">
-          <div class="about-card tilt-card">
+          <div ref="howWorkCardRef" class="about-card tilt-card about-card--how-work">
             <div class="about-card__header">
               <p class="about-card__eyebrow">How I work</p>
             </div>
@@ -58,3 +45,19 @@
     </div>
   </section>
 </template>
+
+<script setup>
+import { onMounted, onUnmounted, ref } from 'vue'
+import { bindCardTilt } from '../composables/useCardTilt.js'
+
+const howWorkCardRef = ref(null)
+let unbindHowWorkTilt = () => {}
+
+onMounted(() => {
+  unbindHowWorkTilt = bindCardTilt(howWorkCardRef.value)
+})
+
+onUnmounted(() => {
+  unbindHowWorkTilt()
+})
+</script>
