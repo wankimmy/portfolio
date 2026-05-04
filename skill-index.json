@@ -1,14 +1,20 @@
 {
+<<<<<<< HEAD
   "version": "1.4.0",
   "generated_from": [
     "AGENTS.md",
     "ai-assistant/references/workspace-layer-architecture.md"
   ],
+=======
+  "version": "1.1.0",
+  "generated_from": "AGENTS.md",
+>>>>>>> 3986c6126012ee6163546e682e439eb354c84b0e
   "routing": {
     "activation_keyword": "bossku",
     "activation_match": "standalone_case_insensitive_word",
     "max_primary_skills": 1,
     "max_secondary_skills": 1,
+<<<<<<< HEAD
     "default_skill_id": "bosskuai-workspace-assistant",
     "no_specialist_min_score": 1.2,
     "ambiguity_margin": 1.2,
@@ -46,6 +52,8 @@
     "manual_only_policy": "Manual-only specialists should activate only from explicit wording or strong domain evidence, not from vague overlap.",
     "alias_policy": "Deprecated alias skills remain for compatibility and should route to their replacement skill.",
     "evaluation_note": "Routing benchmarks are task-fit and workflow proxies, not guarantees of answer accuracy.",
+=======
+>>>>>>> 3986c6126012ee6163546e682e439eb354c84b0e
     "clusters": [
       "orchestration",
       "product",
@@ -62,6 +70,7 @@
   },
   "skills": [
     {
+<<<<<<< HEAD
       "id": "cofounder",
       "cluster": "orchestration",
       "status": "active",
@@ -69,6 +78,8 @@
       "keywords": ["cofounder", "startup tradeoff", "prioritization", "next move", "founder mode"]
     },
     {
+=======
+>>>>>>> 3986c6126012ee6163546e682e439eb354c84b0e
       "id": "bosskuai-workspace-assistant",
       "cluster": "orchestration",
       "status": "active",
