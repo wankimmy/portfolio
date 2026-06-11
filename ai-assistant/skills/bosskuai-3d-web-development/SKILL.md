@@ -408,6 +408,29 @@ For complex scenes where real-time lighting is too expensive:
 - Export with the model — zero runtime lighting cost
 - Combine with one dynamic light for interactive highlights
 
+### Low-poly stylized game world (no noise lib, no textures)
+Proven in production (portfolio hero, 2026-06). A "toy game world" planet that loads instantly — zero texture downloads, zero dependencies beyond three:
+```
+Pattern:
+1. Terrain: new IcosahedronGeometry(1, 5).toNonIndexed() — non-indexed so every facet
+   keeps hard edges and its own flat color
+2. Elevation: layered deterministic trig noise (3 octaves of sin/cos products at
+   frequencies ~2/~5/~9) — continents without importing a noise library
+3. Displace each vertex: r = 0.985 + max(0, elevation) * 0.16, then computeVertexNormals()
+4. Color per FACE (loop i += 3, average the 3 vertex elevations) into a vertex-color
+   attribute: sand -> land -> highland -> snow bands; MeshStandardMaterial with
+   { vertexColors: true, flatShading: true }
+5. Ocean: separate smooth IcosahedronGeometry(1.004, 4) sphere, slightly glossy,
+   opacity ~0.94 — coastlines emerge where terrain pierces it
+6. Atmosphere: BackSide sphere at ~1.16x, MeshBasicMaterial, opacity ~0.14, depthWrite: false
+7. Garnish: flattened icosahedron cloud clusters spread by golden-angle spherical coords;
+   a thin TorusGeometry orbit ring with a small emissive octahedron "airship" marker
+8. Lighting for the toy look: warm key + cool fill + HIGH ambient (~0.85) + ACES tone mapping
+Result: distinctive stylized world, <1ms geometry build, works everywhere WebGL does.
+Keep WebGL over WebGPU for hero-critical content; keep one ready/error/setProgress API
+so 3D centerpieces stay swappable behind the same component contract.
+```
+
 ## Awwwards-quality design principles
 
 ### What makes a 3D site award-worthy

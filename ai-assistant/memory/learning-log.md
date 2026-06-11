@@ -88,3 +88,13 @@ Append new entries in this format:
 - **Status:** applied
 - **Confidence:** high
 - **Last reviewed:** 2026-03-30
+
+### Theme flips are family-mapping problems, not find/replace — 2026-06-11
+
+- **Source:** portfolio third-pass redesign (gold-noir dark → white-cyan light)
+- **Signal:** 235 hard-coded rgba() colors fell cleanly into ~8 semantic families (dark glass, gold lines, black shadows, white sparkles, accent blues, kept-on-purpose dialogue navy); mapping families via script + manual exceptions flipped the whole theme in one pass with only one bug (sweep-order pitfall, see bug-patterns.md)
+- **Decision / learning:** for palette flips, enumerate color families with role context first (text vs border vs glow vs scrim), write per-family mapping rules with alpha-aware branches, keep deliberate anchors unchanged (FF-navy chat, light-gold buttons with dark text), then verify with computed-style probes and section-by-section screenshots
+- **Promote to:** bug-patterns (sweep ordering) + bosskuai-3d-web-development (low-poly world recipe, applied)
+- **Status:** applied
+- **Confidence:** high
+- **Last reviewed:** 2026-06-11

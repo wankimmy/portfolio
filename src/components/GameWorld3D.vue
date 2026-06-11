@@ -495,7 +495,8 @@ onUnmounted(cleanup)
 .world-container {
   position: relative;
   display: block;
-  width: min(720px, 100%);
+  width: 100%;
+  max-width: none;
   aspect-ratio: 1;
   isolation: isolate;
   cursor: grab;

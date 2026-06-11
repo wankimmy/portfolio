@@ -29,4 +29,10 @@ Do **not** use this file for: transient incidents with no repeatable pattern, fu
 
 ## Entries
 
-_(None yet — append using the format above.)_
+### Palette sweep script remapped fresh hand edits — 2026-06
+
+- **Symptom:** after a programmatic dark→light theme flip, card surfaces rendered gold/tan instead of white; computed style showed the new `--surface` variables had been rewritten by the sweep script
+- **Root cause:** ordering — `:root` was hand-edited to new white values *before* running the regex color-sweep, so the sweep's "white → gold sparkle" family rule matched the freshly added `rgba(255,255,255,…)` variables
+- **Invariant to enforce:** run bulk color/regex sweeps FIRST, hand-edit exceptions after; never interleave hand edits between writing and running a sweep script
+- **Where to check:** any programmatic find/replace over CSS/design tokens; verify with computed-style probe (`getComputedStyle`) on a representative element, not just visual diff
+
