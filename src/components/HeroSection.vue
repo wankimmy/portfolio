@@ -24,15 +24,16 @@
     <div class="hero__inner hero__pin-target">
       <header class="hero__copy hero__lift">
         <p class="hero__greeting">Hi, I'm Safwan Hakim</p>
-        <p class="hero__role">Software Manager · Full-Stack Developer</p>
+        <p class="hero__role">Lv. 10 Software Manager · Full-Stack Developer</p>
 
         <h1 id="hero-heading" class="hero__title">
-          <span class="hero__title-line">I love exploring</span>
-          <span class="hero__title-line hero__title-line--accent">new tech and ideas.</span>
+          <span class="hero__title-line">Every project is</span>
+          <span class="hero__title-line hero__title-line--accent">a new expedition.</span>
         </h1>
+        <p class="hero__motto">“When one build ships, the next begins.”</p>
         <br>
         <div class="hero__actions">
-          <a class="button button--primary" href="#projects">See work</a>
+          <a class="button button--primary" href="#projects">▸ Begin quest</a>
           <a class="button button--ghost" href="mailto:putrafyp@gmail.com">Contact me</a>
         </div>
 
@@ -74,7 +75,7 @@
       </header>
 
       <div class="hero__planet hero__scale">
-        <Earth3D
+        <GameWorld3D
           ref="earthRef"
           class="hero__planet-canvas"
           @ready="$emit('earth-ready')"
@@ -89,7 +90,7 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import gsap from 'gsap'
 
-import Earth3D from './Earth3D.vue'
+import GameWorld3D from './GameWorld3D.vue'
 
 defineEmits(['earth-ready', 'earth-error'])
 

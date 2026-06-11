@@ -115,9 +115,34 @@ All components use **Tailwind CSS** for styling. Edit component files to customi
 The portfolio includes:
 1. **Hero** - Introduction with social media links
 2. **About** - Personal info and statistics
-3. **Experience** - Professional work history timeline
-4. **Projects** - Featured projects with images
-5. **Technologies** - Skills and tools you use
+3. **Technologies** - Skills and tools you use
+4. **Experience** - Professional work history timeline
+5. **Projects** - Featured projects with images
+6. **Services** - What you can hire me for
+7. **Pricing** - Transparent starting prices (MYR) + monthly care plan
+8. **Certificates** - Credentials and training
+9. **Footer** - Contact CTA (WhatsApp / email)
+
+Plus a floating **AI chatbot** that answers questions about services, pricing, and experience.
+
+## 🤖 AI Chatbot (Ollama Cloud)
+
+The chat widget streams replies from [Ollama Cloud](https://ollama.com) (default model: `gemma4:31b-cloud`).
+The API key stays **server-side only** — the browser calls `/api/ollama/chat`, and the proxy
+injects the `Authorization` header:
+
+- **Dev:** Vite dev server proxy (see `vite.config.js`)
+- **Prod:** nginx proxy with the key injected via envsubst (see `nginx.conf`, rate-limited per IP)
+
+### Setup
+
+1. Get an API key at https://ollama.com/settings/keys
+2. Copy `.env.example` to `.env` and set `OLLAMA_API_KEY=...`
+3. Dev: `npm run dev` (or `docker compose up -d` — the key is passed through)
+4. Prod: `docker build -t portfolio . && docker run -p 80:80 -e OLLAMA_API_KEY=your-key portfolio`
+
+Without a key the widget still works — it falls back to a friendly "WhatsApp me instead" message.
+To change the model, set `VITE_OLLAMA_MODEL` (e.g. `deepseek-v3.1:cloud`, `gpt-oss:120b-cloud`).
 
 ## 📦 Tech Stack
 

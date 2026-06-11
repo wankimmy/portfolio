@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 260" width="220" height="260">
+  <defs>
+    <linearGradient id="gemBody" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f3dfae"/>
+      <stop offset="0.45" stop-color="#d4a843"/>
+      <stop offset="1" stop-color="#7a5a22"/>
+    </linearGradient>
+    <linearGradient id="gemLeft" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8a6a2f"/>
+      <stop offset="1" stop-color="#c79a3e"/>
+    </linearGradient>
+    <linearGradient id="gemRight" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#e8c97a"/>
+      <stop offset="1" stop-color="#9a7430"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffd98a" stop-opacity="0.55"/>
+      <stop offset="0.6" stop-color="#d4a843" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#d4a843" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+  </defs>
+
+  <!-- Halo glow -->
+  <ellipse cx="110" cy="130" rx="95" ry="110" fill="url(#glow)"/>
+
+  <!-- Main gem: elongated facet diamond -->
+  <g>
+    <!-- back silhouette for depth -->
+    <polygon points="110,18 158,108 110,242 62,108" fill="#3a2a10" opacity="0.9"/>
+    <!-- left dark facet -->
+    <polygon points="110,18 62,108 110,242" fill="url(#gemLeft)"/>
+    <!-- right light facet -->
+    <polygon points="110,18 158,108 110,242" fill="url(#gemRight)"/>
+    <!-- top cap facets -->
+    <polygon points="110,18 86,98 110,120" fill="url(#gemBody)" opacity="0.92"/>
+    <polygon points="110,18 134,98 110,120" fill="#f3dfae" opacity="0.55"/>
+    <!-- centre seam highlight -->
+    <polygon points="110,18 114,108 110,242 106,108" fill="#ffe9bb" opacity="0.65"/>
+    <!-- inner shine -->
+    <polygon points="98,70 108,60 104,118 94,112" fill="#fff3d6" opacity="0.5" filter="url(#soft)"/>
+  </g>
+
+  <!-- Edge lines -->
+  <g fill="none" stroke="#f3dfae" stroke-opacity="0.5" stroke-width="1.2">
+    <polygon points="110,18 158,108 110,242 62,108"/>
+    <line x1="62" y1="108" x2="158" y2="108"/>
+  </g>
+
+  <!-- Orbiting sparkle shards -->
+  <g fill="#e8c97a">
+    <polygon points="36,84 42,96 36,108 30,96" opacity="0.9"/>
+    <polygon points="184,140 189,150 184,160 179,150" opacity="0.8"/>
+    <polygon points="166,52 170,60 166,68 162,60" opacity="0.7"/>
+    <polygon points="48,182 53,192 48,202 43,192" opacity="0.75"/>
+  </g>
+  <g fill="#fff3d6">
+    <circle cx="70" cy="48" r="2.2" opacity="0.9"/>
+    <circle cx="190" cy="96" r="1.8" opacity="0.8"/>
+    <circle cx="26" cy="140" r="1.6" opacity="0.7"/>
+    <circle cx="150" cy="222" r="2" opacity="0.75"/>
+  </g>
+</svg>

@@ -18,3 +18,5 @@ services:
       - NODE_ENV=development
       # Use polling so file changes on host are detected in the container
       - CHOKIDAR_USEPOLLING=true
+      # Ollama Cloud key for the AI chatbot (set it in .env, never commit it)
+      - OLLAMA_API_KEY=${OLLAMA_API_KEY:-}

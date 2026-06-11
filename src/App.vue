@@ -19,7 +19,7 @@
             <div ref="rocketInnerRef" class="app-loading__rocket-inner">
               <img
                 class="app-loading__rocket"
-                :src="rocketLoaderUrl"
+                :src="crystalLoaderUrl"
                 alt=""
                 width="220"
                 height="260"
@@ -31,8 +31,8 @@
             </div>
           </div>
           <div ref="splashCopyRef" class="app-loading__copy">
-            <p class="app-loading__kicker">Launching</p>
-            <p class="app-loading__label">Preparing your orbit…</p>
+            <p class="app-loading__kicker">✦ Expedition ✦</p>
+            <p class="app-loading__label">Summoning a new journey…</p>
           </div>
         </div>
       </div>
@@ -64,8 +64,14 @@
       <TechSection />
       <ExperienceSection />
       <ProjectsSection />
+      <ServicesSection />
+      <PricingSection />
       <CertificatesSection />
     </main>
+
+    <SiteFooter />
+
+    <ChatWidget />
 
     <button
       v-if="showScrollTop"
@@ -86,7 +92,7 @@ import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
-import rocketLoaderUrl from './assets/rocket-loader.svg'
+import crystalLoaderUrl from './assets/crystal-loader.svg'
 import { bindCardTilt } from './composables/useCardTilt.js'
 import { createCinematicScroll } from './composables/useCinematicScroll.js'
 import Navbar from './components/Navbar.vue'
@@ -95,12 +101,25 @@ import AboutSection from './components/AboutSection.vue'
 import TechSection from './components/TechSection.vue'
 import ExperienceSection from './components/ExperienceSection.vue'
 import ProjectsSection from './components/ProjectsSection.vue'
+import ServicesSection from './components/ServicesSection.vue'
+import PricingSection from './components/PricingSection.vue'
 import CertificatesSection from './components/CertificatesSection.vue'
+import SiteFooter from './components/SiteFooter.vue'
+import ChatWidget from './components/ChatWidget.vue'
 
 /** Minimum time splash holds so the Earth scene can warm up */
 const MIN_LOADING_MS = 2400
 
-const SCROLL_SECTION_IDS = ['home', 'about', 'tech', 'experience', 'projects', 'certificates']
+const SCROLL_SECTION_IDS = [
+  'home',
+  'about',
+  'tech',
+  'experience',
+  'projects',
+  'services',
+  'pricing',
+  'certificates',
+]
 
 const scrollProgress = ref(0)
 const showScrollTop = ref(false)
@@ -117,6 +136,8 @@ const splashCopyRef = ref(null)
 
 /** Lenis instance when smooth scroll active */
 let smoothScroll = null
+/** Tears down the Lenis + GSAP ticker wiring; assigned once scroll engine boots */
+let disposeSmoothScroll = () => {}
 let loadingFallbackTimer
 let hideLoadTimer
 let loadStartedAt = 0
@@ -470,7 +491,7 @@ onMounted(async () => {
       },
       () => {
         const neutral = gsap.utils.toArray(
-          '.reveal,#tech .tech-card,#experience .experience-item,#projects .depth-reveal',
+          '.reveal,#tech .tech-card,#experience .quest-node,#projects .depth-reveal,#services .service-card,#pricing .pricing-card,.char-card,.quest-track__line,.quest-node__marker',
         )
         gsap.set(neutral, {
           autoAlpha: 1,
@@ -484,129 +505,155 @@ onMounted(async () => {
         prefersMotion: '(prefers-reduced-motion: no-preference)',
       },
       () => {
-        const SCROLL_SCRUB = 1.06
+        /**
+         * Game-menu style entrances: animations PLAY once when a section enters
+         * the viewport (instead of scrubbing with scroll), which feels smoother
+         * with Lenis and reads like RPG menu items sliding into place.
+         */
+        const enterStagger = (items, { trigger, scrollTrigger, ...vars } = {}) => {
+          if (!items.length) {
+            return
+          }
+          gsap.from(items, {
+            autoAlpha: 0,
+            duration: 0.85,
+            ease: 'power3.out',
+            stagger: 0.1,
+            clearProps: 'transform,filter',
+            ...vars,
+            scrollTrigger: {
+              trigger: trigger ?? items[0],
+              start: 'top 86%',
+              once: true,
+              ...scrollTrigger,
+            },
+          })
+        }
 
-        gsap.utils.toArray('.reveal').forEach((el, index) => {
-          const skew = index % 2 === 0 ? 1.1 : -1.1
+        // Generic headings/blocks — soft rise + unblur (certificates get their own pop)
+        gsap.utils.toArray('.reveal').forEach((el) => {
+          if (el.classList.contains('cert-card')) {
+            return
+          }
+          gsap.from(el, {
+            autoAlpha: 0,
+            y: 34,
+            filter: 'blur(6px)',
+            duration: 0.95,
+            ease: 'power3.out',
+            clearProps: 'transform,filter',
+            scrollTrigger: { trigger: el, start: 'top 90%', once: true },
+          })
+        })
+
+        // Abilities — cards tilt up into place like menu entries
+        enterStagger(gsap.utils.toArray('#tech .tech-card'), {
+          trigger: '#tech .tech-grid',
+          y: 46,
+          rotateX: 9,
+          transformOrigin: '50% 85%',
+          transformPerspective: 1100,
+        })
+
+        // Quest log — the gold track draws with scroll, nodes slide in as reached
+        const questLine = document.querySelector('.quest-track__line')
+        if (questLine) {
           gsap.fromTo(
-            el,
-            { autoAlpha: 0.12, y: 44, skewY: skew, filter: 'blur(8px)', scale: 0.99 },
+            questLine,
+            { scaleY: 0 },
             {
-              autoAlpha: 1,
-              y: 0,
-              skewY: 0,
-              filter: 'blur(0px)',
-              scale: 1,
+              scaleY: 1,
               ease: 'none',
-              immediateRender: false,
               scrollTrigger: {
-                trigger: el,
-                start: 'top 92%',
-                end: 'top 64%',
-                scrub: SCROLL_SCRUB,
+                trigger: '.quest-track',
+                start: 'top 80%',
+                end: 'bottom 55%',
+                scrub: 0.8,
                 invalidateOnRefresh: true,
               },
             },
           )
+        }
+
+        gsap.utils.toArray('#experience .quest-node').forEach((node) => {
+          const marker = node.querySelector('.quest-node__marker')
+          const card = node.querySelector('.quest-node__card')
+          const tl = gsap.timeline({
+            scrollTrigger: { trigger: node, start: 'top 84%', once: true },
+          })
+          if (marker) {
+            tl.from(marker, {
+              scale: 0,
+              autoAlpha: 0,
+              duration: 0.5,
+              ease: 'back.out(2.2)',
+            })
+          }
+          if (card) {
+            tl.from(
+              card,
+              {
+                x: -42,
+                autoAlpha: 0,
+                duration: 0.8,
+                ease: 'power3.out',
+                clearProps: 'transform',
+              },
+              '-=0.25',
+            )
+          }
         })
 
-        const techCards = gsap.utils.toArray('#tech .tech-card')
-        if (techCards.length) {
-          const techTl = gsap.timeline({
-            defaults: { ease: 'none' },
-            scrollTrigger: {
-              trigger: '#tech',
-              start: 'top 92%',
-              end: 'bottom 50%',
-              scrub: SCROLL_SCRUB,
-              invalidateOnRefresh: true,
-            },
-          })
-          techCards.forEach((card, index) => {
-            techTl.fromTo(
-              card,
-              {
-                rotateX: 13,
-                y: 52,
-                autoAlpha: 0,
-                transformOrigin: '50% 85%',
-                transformPerspective: 1200,
-              },
-              {
-                rotateX: 0,
-                y: 0,
-                autoAlpha: 1,
-              },
-              index * 0.09,
-            )
-          })
-        }
+        // Completed quests — mission cards rise with depth
+        enterStagger(gsap.utils.toArray('#projects .depth-reveal'), {
+          trigger: '#projects .projects-grid',
+          y: 54,
+          scale: 0.94,
+          transformOrigin: '50% 90%',
+          transformPerspective: 1100,
+          stagger: 0.11,
+        })
 
-        const experienceItems = gsap.utils.toArray('#experience .experience-item')
-        if (experienceItems.length) {
-          const expTl = gsap.timeline({
-            defaults: { ease: 'none' },
-            scrollTrigger: {
-              trigger: '#experience',
-              start: 'top 92%',
-              end: 'bottom 52%',
-              scrub: SCROLL_SCRUB,
-              invalidateOnRefresh: true,
-            },
+        // Guild services — alternating swing-in
+        const serviceCards = gsap.utils.toArray('#services .service-card')
+        serviceCards.forEach((card, index) => {
+          gsap.from(card, {
+            autoAlpha: 0,
+            y: 44,
+            rotateY: index % 2 === 0 ? -8 : 8,
+            transformPerspective: 1100,
+            duration: 0.85,
+            ease: 'power3.out',
+            delay: (index % 3) * 0.1,
+            clearProps: 'transform',
+            scrollTrigger: { trigger: card, start: 'top 88%', once: true },
           })
-          experienceItems.forEach((item, index) => {
-            const alt = index % 2 === 0
-            expTl.fromTo(
-              item,
-              {
-                rotateY: alt ? -8 : 8,
-                x: alt ? -40 : 40,
-                autoAlpha: 0,
-                transformPerspective: 1200,
-              },
-              {
-                rotateY: 0,
-                x: 0,
-                autoAlpha: 1,
-              },
-              index * 0.08,
-            )
-          })
-        }
+        })
 
-        const projectCards = gsap.utils.toArray('#projects .depth-reveal')
-        if (projectCards.length) {
-          const projTl = gsap.timeline({
-            defaults: { ease: 'none' },
-            scrollTrigger: {
-              trigger: '#projects',
-              start: 'top 92%',
-              end: 'bottom 48%',
-              scrub: SCROLL_SCRUB,
-              invalidateOnRefresh: true,
-            },
+        // Item shop — cards present themselves with a slight overshoot
+        enterStagger(gsap.utils.toArray('#pricing .pricing-card'), {
+          trigger: '#pricing .pricing-grid',
+          y: 58,
+          scale: 0.93,
+          duration: 0.95,
+          ease: 'back.out(1.25)',
+          stagger: 0.13,
+          transformOrigin: '50% 95%',
+        })
+
+        // Achievements — unlock pop
+        gsap.utils.toArray('#certificates .cert-card').forEach((card, index) => {
+          gsap.from(card, {
+            autoAlpha: 0,
+            scale: 0.86,
+            y: 26,
+            duration: 0.75,
+            ease: 'back.out(1.7)',
+            delay: (index % 4) * 0.08,
+            clearProps: 'transform',
+            scrollTrigger: { trigger: card, start: 'top 90%', once: true },
           })
-          projectCards.forEach((card, index) => {
-            projTl.fromTo(
-              card,
-              {
-                rotateX: 10,
-                scale: 0.91,
-                y: 56,
-                autoAlpha: 0,
-                transformOrigin: '50% 90%',
-                transformPerspective: 1200,
-              },
-              {
-                rotateX: 0,
-                scale: 1,
-                y: 0,
-                autoAlpha: 1,
-              },
-              index * 0.095,
-            )
-          })
-        }
+        })
       },
     )
   }, appShellRef.value ?? '#app')
@@ -662,10 +709,10 @@ onUnmounted(() => {
   pointer-events: auto;
   isolation: isolate;
   background:
-    radial-gradient(circle at 24% 38%, rgba(109, 198, 255, 0.12), transparent 38%),
-    radial-gradient(circle at 72% 22%, rgba(90, 130, 255, 0.1), transparent 32%),
-    radial-gradient(circle at 62% 78%, rgba(97, 255, 219, 0.06), transparent 30%),
-    linear-gradient(180deg, #06111c 0%, #071321 48%, #061018 100%);
+    radial-gradient(circle at 24% 38%, rgba(235, 196, 129, 0.12), transparent 38%),
+    radial-gradient(circle at 72% 22%, rgba(232, 188, 113, 0.1), transparent 32%),
+    radial-gradient(circle at 62% 78%, rgba(233, 191, 119, 0.06), transparent 30%),
+    linear-gradient(180deg, #f3f9fa 0%, #e9f3f5 48%, #dcedf1 100%);
 }
 
 .app-loading__galaxy {
@@ -674,9 +721,9 @@ onUnmounted(() => {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 24% 42%, rgba(109, 198, 255, 0.18), transparent 34%),
-    radial-gradient(circle at 72% 26%, rgba(90, 130, 255, 0.14), transparent 30%),
-    radial-gradient(circle at 64% 74%, rgba(97, 255, 219, 0.08), transparent 28%);
+    radial-gradient(circle at 24% 42%, rgba(235, 196, 129, 0.18), transparent 34%),
+    radial-gradient(circle at 72% 26%, rgba(232, 188, 113, 0.14), transparent 30%),
+    radial-gradient(circle at 64% 74%, rgba(233, 191, 119, 0.08), transparent 28%);
   filter: blur(10px);
   animation:
     app-loading-galaxy-pulse 14s ease-in-out infinite,
@@ -691,9 +738,9 @@ onUnmounted(() => {
   opacity: 0.42;
   filter: blur(72px);
   background:
-    radial-gradient(ellipse 50% 40% at 28% 38%, rgba(100, 188, 230, 0.16), transparent 55%),
-    radial-gradient(ellipse 45% 38% at 72% 28%, rgba(92, 150, 255, 0.12), transparent 52%),
-    radial-gradient(ellipse 55% 42% at 48% 68%, rgba(57, 216, 230, 0.1), transparent 50%);
+    radial-gradient(ellipse 50% 40% at 28% 38%, rgba(212, 177, 118, 0.16), transparent 55%),
+    radial-gradient(ellipse 45% 38% at 72% 28%, rgba(232, 189, 115, 0.12), transparent 52%),
+    radial-gradient(ellipse 55% 42% at 48% 68%, rgba(206, 160, 81, 0.1), transparent 50%);
   animation: app-loading-aurora-drift 54s ease-in-out infinite alternate;
 }
 
@@ -708,9 +755,9 @@ onUnmounted(() => {
 .app-loading__star-drift--far {
   opacity: 0.32;
   background-image:
-    radial-gradient(circle, rgba(255, 255, 255, 0.55) 0, transparent 1.35px),
-    radial-gradient(circle, rgba(200, 228, 255, 0.35) 0, transparent 1.2px),
-    radial-gradient(circle, rgba(255, 255, 255, 0.3) 0, transparent 1.5px);
+    radial-gradient(circle, rgba(180, 134, 58, 0.5) 0, transparent 1.35px),
+    radial-gradient(circle, rgba(199, 152, 74, 0.32) 0, transparent 1.2px),
+    radial-gradient(circle, rgba(20, 144, 173, 0.32) 0, transparent 1.5px);
   background-size: 283px 251px, 197px 173px, 331px 289px;
   background-position: 0 0, 47px 83px, 19px 31px;
   animation: app-loading-stars-drift-far 32s linear infinite;
@@ -719,9 +766,9 @@ onUnmounted(() => {
 .app-loading__star-drift--near {
   opacity: 0.38;
   background-image:
-    radial-gradient(ellipse 1px 8px at center, rgba(255, 255, 255, 0.82) 0, transparent 100%),
-    radial-gradient(ellipse 1px 6px at center, rgba(180, 230, 255, 0.62) 0, transparent 100%),
-    radial-gradient(ellipse 1.5px 10px at center, rgba(255, 255, 255, 0.52) 0, transparent 100%);
+    radial-gradient(ellipse 1px 8px at center, rgba(180, 134, 58, 0.6) 0, transparent 100%),
+    radial-gradient(ellipse 1px 6px at center, rgba(199, 152, 74, 0.5) 0, transparent 100%),
+    radial-gradient(ellipse 1.5px 10px at center, rgba(20, 144, 173, 0.4) 0, transparent 100%);
   background-size: 199px 173px, 137px 211px, 163px 227px;
   background-position: 0 0, 61px 37px, 113px 89px;
   animation: app-loading-stars-drift-near 18s linear infinite;
@@ -734,8 +781,8 @@ onUnmounted(() => {
   pointer-events: none;
   opacity: 0.056;
   background:
-    radial-gradient(ellipse 30% 50% at 50% 42%, rgba(100, 170, 255, 0.18) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 35% at 50% 42%, rgba(60, 130, 220, 0.08) 0%, transparent 55%);
+    radial-gradient(ellipse 30% 50% at 50% 42%, rgba(233, 192, 122, 0.18) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 35% at 50% 42%, rgba(198, 155, 82, 0.08) 0%, transparent 55%);
   animation: app-loading-warp-breathe 9s ease-in-out infinite;
 }
 
@@ -749,8 +796,8 @@ onUnmounted(() => {
     102deg,
     transparent 0,
     transparent 100px,
-    rgba(160, 220, 255, 0.16) 100px,
-    rgba(160, 220, 255, 0.16) 101px,
+    rgba(242, 217, 173, 0.16) 100px,
+    rgba(242, 217, 173, 0.16) 101px,
     transparent 101px,
     transparent 220px
   );
@@ -768,9 +815,9 @@ onUnmounted(() => {
   background-repeat: no-repeat;
   background-size: 100% 100%;
   background-image:
-    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.55) 0, transparent 1px),
-    radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.38) 0, transparent 1px),
-    radial-gradient(circle at 50% 70%, rgba(200, 230, 255, 0.35) 0, transparent 1px);
+    radial-gradient(circle at 20% 20%, rgba(180, 134, 58, 0.5) 0, transparent 1px),
+    radial-gradient(circle at 80% 30%, rgba(180, 134, 58, 0.36) 0, transparent 1px),
+    radial-gradient(circle at 50% 70%, rgba(199, 152, 74, 0.32) 0, transparent 1px);
   pointer-events: none;
   animation:
     app-loading-starfield-twinkle 10s ease-in-out infinite,
@@ -818,8 +865,8 @@ onUnmounted(() => {
   border-radius: 50%;
   background: radial-gradient(
     ellipse at 50% 70%,
-    rgba(57, 216, 230, 0.35) 0%,
-    rgba(124, 239, 245, 0.12) 45%,
+    rgba(206, 160, 81, 0.35) 0%,
+    rgba(228, 196, 141, 0.12) 45%,
     transparent 72%
   );
   filter: blur(8px);
@@ -837,7 +884,7 @@ onUnmounted(() => {
   display: block;
   width: 100%;
   height: auto;
-  filter: drop-shadow(0 12px 32px rgba(57, 216, 230, 0.4)) drop-shadow(0 0 18px rgba(57, 216, 230, 0.15));
+  filter: drop-shadow(0 12px 32px rgba(206, 160, 81, 0.4)) drop-shadow(0 0 18px rgba(206, 160, 81, 0.15));
 }
 
 /* Flame is baked into rocket-loader.svg */
@@ -867,9 +914,10 @@ onUnmounted(() => {
 
 .app-loading__label {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 0.95rem;
   font-weight: 500;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
   color: var(--text-soft);
   text-wrap: balance;
 }

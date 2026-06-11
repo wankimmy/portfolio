@@ -3,10 +3,10 @@
     <div class="section__inner">
       <div class="section-heading section-heading--split reveal">
         <div>
-          <p class="section-kicker">Certificates</p>
-          <h2 class="section-title">I'm bored so I want to learn something new.</h2>
+          <p class="section-kicker">Achievements</p>
+          <h2 class="section-title">Achievements unlocked between quests.</h2>
         </div>
-        <p class="section-index">02</p>
+        <p class="section-index">04</p>
       </div>
 
       <div class="cert-grid">
@@ -17,12 +17,13 @@
           :style="{ '--cert-glow': cert.glow }"
         >
           <div class="cert-card__ambient" aria-hidden="true"></div>
+          <div class="gilt-frame" aria-hidden="true"></div>
           <div class="cert-card__overlay" aria-hidden="true"></div>
           <div class="cert-card__content">
             <span class="cert-card__icon">{{ cert.icon }}</span>
             <p class="cert-card__issuer">{{ cert.issuer }}</p>
             <h3>{{ cert.name }}</h3>
-            <p class="cert-card__date">{{ cert.date }}</p>
+            <p class="cert-card__date">Unlocked {{ cert.date }}</p>
             <p class="cert-card__description">{{ cert.description }}</p>
             <a
               v-if="cert.file"
@@ -51,7 +52,7 @@ const certificates = [
     description: 'Hands-on security training for web apps.',
     icon: 'SEC',
     file: '/assets/R001174-Safwan-Hakim-Bin-Yacob.pdf',
-    glow: 'radial-gradient(circle at top left, rgba(124, 239, 245, 0.2), transparent 60%)',
+    glow: 'radial-gradient(circle at top left, rgba(176, 128, 52, 0.2), transparent 60%)',
   },
   {
     id: 2,
@@ -61,7 +62,7 @@ const certificates = [
     description: 'Core web security basics and safe coding practice.',
     icon: 'APP',
     file: '/assets/Safwan_Hakim_owasp.pdf',
-    glow: 'radial-gradient(circle at top right, rgba(255, 180, 106, 0.16), transparent 62%)',
+    glow: 'radial-gradient(circle at top right, rgba(20, 144, 173, 0.16), transparent 62%)',
   },
   {
     id: 3,
@@ -71,7 +72,7 @@ const certificates = [
     description: 'Basic security for connected devices and communication.',
     icon: 'IOT',
     file: '/assets/E-cert_IoT_Security_Safwan_Hakim.pdf',
-    glow: 'radial-gradient(circle at center, rgba(124, 239, 245, 0.14), transparent 58%)',
+    glow: 'radial-gradient(circle at center, rgba(176, 128, 52, 0.14), transparent 58%)',
   },
   {
     id: 4,
@@ -81,7 +82,7 @@ const certificates = [
     description: 'Basic knowledge of automation, IoT, and digital systems.',
     icon: 'IR4',
     file: '/assets/IR4.0_E-Cert_Safwan_Hakim_Bin_Yacob.pdf',
-    glow: 'radial-gradient(circle at bottom right, rgba(255, 180, 106, 0.14), transparent 64%)',
+    glow: 'radial-gradient(circle at bottom right, rgba(20, 144, 173, 0.14), transparent 64%)',
   },
 ]
 </script>

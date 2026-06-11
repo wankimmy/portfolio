@@ -1,7 +1,7 @@
 <template>
   <header :class="['site-nav', { 'site-nav--scrolled': isScrolled, 'site-nav--open': isOpen }]">
     <div class="site-nav__inner">
-      <button class="site-nav__brand" type="button" @click="scrollTo('home')">SH</button>
+      <button class="site-nav__brand" type="button" @click="scrollTo('home')">✦ SH</button>
 
       <nav class="site-nav__links" aria-label="Primary">
         <button
@@ -69,10 +69,12 @@ const isScrolled = ref(false)
 
 const navLinks = [
   { id: 1, name: 'About', href: 'about' },
-  { id: 2, name: 'Technologies', href: 'tech' },
+  { id: 2, name: 'Skills', href: 'tech' },
   { id: 3, name: 'Experience', href: 'experience' },
   { id: 4, name: 'Projects', href: 'projects' },
-  { id: 5, name: 'Certifications', href: 'certificates' },
+  { id: 5, name: 'Services', href: 'services' },
+  { id: 6, name: 'Pricing', href: 'pricing' },
+  { id: 7, name: 'Certifications', href: 'certificates' },
 ]
 
 const scrollTo = (targetId) => {
