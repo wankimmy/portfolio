@@ -41,7 +41,8 @@ const MAX_TILT_X = 0.52
 /** Radians per second — slow idle spin when not dragging */
 const AUTO_SPIN_SPEED = 0.12
 
-const BASE_CAMERA_Z = 5.05
+/** Pulled back so the 1.72-radius orbit ring and airship stay inside the frame */
+const BASE_CAMERA_Z = 5.85
 /** 0–1 scroll-driven cinematic offset (target) */
 let cinematicTarget = 0
 let cinematicSmooth = 0
@@ -302,10 +303,10 @@ const animate = () => {
     const k = cinematicSmooth
     cinematicGroup.rotation.y = k * -0.42
     cinematicGroup.rotation.x = k * 0.09
-    cinematicGroup.position.z = k * -0.45
+    cinematicGroup.position.z = k * -0.32
   }
 
-  camera.position.z = BASE_CAMERA_Z - cinematicSmooth * 0.65
+  camera.position.z = BASE_CAMERA_Z - cinematicSmooth * 0.42
 
   if (!isDragging) {
     spinGroup.rotation.y += delta * AUTO_SPIN_SPEED
