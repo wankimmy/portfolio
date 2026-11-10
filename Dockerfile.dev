@@ -9,7 +9,8 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
-# Copy source (will be overridden by volume mount when using docker-compose)
+# Bake full tree including public/models + public/videos (served from Linux FS).
+# docker-compose only bind-mounts src/ + config for HMR — not public/.
 COPY . .
 
 # Expose Vite dev server port

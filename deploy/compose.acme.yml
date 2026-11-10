@@ -1,0 +1,9 @@
+# Overlay: ask Let's Encrypt for the certificate. Applied by the deploy script
+# only when safwanhakim.com already resolves to this server, because failed
+# validations count against Let's Encrypt's hourly limit for the hostname.
+services:
+  site:
+    labels:
+      traefik.http.routers.portfolio.tls.certresolver: letsencrypt
+      traefik.http.routers.portfolio.tls.domains[0].main: safwanhakim.com
+      traefik.http.routers.portfolio.tls.domains[0].sans: www.safwanhakim.com

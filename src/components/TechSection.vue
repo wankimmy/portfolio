@@ -1,104 +1,87 @@
 <template>
-  <section id="tech" ref="sectionRef" class="section">
-    <div class="section__inner">
-      <div class="section-heading section-heading--split reveal">
-        <div>
-          <p class="section-kicker">Abilities</p>
-          <h2 class="section-title">Skills honed across a decade of quests.</h2>
-        </div>
-        <p class="section-index">01</p>
-      </div>
+  <section id="tech" ref="sectionRef" class="section abilities">
+    <div class="wrap">
+      <header class="section__head">
+        <p class="label">Abilities</p>
+        <h2 class="h2" data-split>Nine years of weapons forged.</h2>
+      </header>
+    </div>
 
-      <div class="tech-grid">
-        <div v-for="group in techGroups" :key="group.title" class="tech-grid__item">
-          <article class="tech-card tilt-card">
-            <h3 class="tech-card__heading">{{ group.title }}</h3>
-            <div class="ability-bar">
-              <p class="ability-bar__meta">
-                <span>Mastery</span>
-                <strong>{{ group.mastery }} / 100</strong>
-              </p>
-              <span class="ability-bar__track">
-                <span class="ability-bar__fill" :style="{ '--mastery': group.mastery + '%' }"></span>
-              </span>
-            </div>
-            <div class="tech-card__chips">
-              <span v-for="item in group.items" :key="item">{{ item }}</span>
-            </div>
-          </article>
+    <!-- Each row lists its skills once for readers; the moving copy is decoration. -->
+    <div class="abilities__rows">
+      <div v-for="(row, index) in skillRows" :key="row.label" class="ability-row">
+        <p class="label ability-row__label wrap">{{ row.label }}</p>
+        <ul class="sr-only">
+          <li v-for="item in row.items" :key="item">{{ item }}</li>
+        </ul>
+        <div class="ability-row__viewport" aria-hidden="true">
+          <div class="ability-row__track" :class="{ 'ability-row__track--alt': index % 2 === 1 }">
+            <span v-for="n in 2" :key="n" class="ability-row__set">
+              <span v-for="item in row.items" :key="item" class="ability-row__item">{{ item }}</span>
+            </span>
+          </div>
         </div>
       </div>
+    </div>
+
+    <div class="wrap abilities__foot">
+      <button type="button" class="btn btn--line" :aria-pressed="!site.motionOn.value" @click="site.toggleMotion">
+        {{ site.motionOn.value ? 'Pause motion' : 'Resume motion' }}
+      </button>
     </div>
   </section>
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
+import { inject, onMounted, onUnmounted, ref, watch } from 'vue'
 import gsap from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
+import { skillRows } from '../content.js'
+
+const site = inject('site')
 const sectionRef = ref(null)
-let ctx
+let mm = null
+let loops = []
 
-const techGroups = [
-  {
-    title: 'Frontend',
-    mastery: 92,
-    items: ['Vue.js', 'React', 'Nuxt', 'HTML & CSS', 'Bootstrap', 'Tailwind'],
-  },
-  {
-    title: 'Backend',
-    mastery: 95,
-    items: ['Laravel', 'Yii2', 'Node.js', 'Wordpress', 'Integrations', 'REST APIs'],
-  },
-  {
-    title: 'Database',
-    mastery: 90,
-    items: ['MySQL', 'PostgreSQL', 'MariaDB', 'Redis', 'SQLite', 'CouchDB'],
-  },
-  {
-    title: 'IoT',
-    mastery: 84,
-    items: ['Node-RED', 'Raspberry Pi', 'MQTT', 'Arduino', 'Sensors', 'Python'],
-  },
-  {
-    title: 'Hosting',
-    mastery: 88,
-    items: ['AWS', 'Docker', 'Nginx', 'Cloudflare', 'Hostinger', 'Linux'],
-  },
-  {
-    title: 'Tools',
-    mastery: 91,
-    items: ['Codex', 'Claude', 'Cursor', 'CodeRabbit', 'Git', 'Postman'],
-  },
-]
+watch(
+  () => site.motionOn.value,
+  (on) => loops.forEach((loop) => (on ? loop.play() : loop.pause())),
+)
 
 onMounted(() => {
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  if (reduceMotion || !sectionRef.value) {
-    return
-  }
-
-  ctx = gsap.context(() => {
-    gsap.utils.toArray('.ability-bar__fill').forEach((fill) => {
-      gsap.fromTo(
-        fill,
-        { scaleX: 0 },
-        {
-          scaleX: 1,
-          duration: 1.3,
-          ease: 'power3.out',
-          scrollTrigger: {
-            trigger: fill,
-            start: 'top 90%',
-            once: true,
-          },
-        },
+  mm = gsap.matchMedia()
+  mm.add('(prefers-reduced-motion: no-preference)', () => {
+    const tracks = gsap.utils.toArray('.ability-row__track', sectionRef.value)
+    // two identical sets side by side: sliding by half the track loops with no visible jump
+    loops = tracks.map((track, index) => {
+      const reverse = index % 2 === 1
+      return gsap.fromTo(
+        track,
+        { xPercent: reverse ? -50 : 0 },
+        { xPercent: reverse ? 0 : -50, duration: 46 + index * 8, ease: 'none', repeat: -1, paused: !site.motionOn.value },
       )
     })
-  }, sectionRef.value)
+
+    // scrolling pushes the rows faster; they settle back when you stop
+    const settle = gsap.quickTo(loops, 'timeScale', { duration: 0.8, ease: 'power2.out' })
+    const trigger = ScrollTrigger.create({
+      trigger: sectionRef.value,
+      start: 'top bottom',
+      end: 'bottom top',
+      onUpdate: (self) => {
+        gsap.set(loops, { timeScale: 1 + Math.min(6, Math.abs(self.getVelocity()) / 350) })
+        settle(1)
+      },
+    })
+
+    return () => {
+      trigger.kill()
+      loops.forEach((loop) => loop.kill())
+      loops = []
+    }
+  })
 })
 
-onUnmounted(() => {
-  ctx?.revert()
-})
+onUnmounted(() => mm?.revert())
 </script>

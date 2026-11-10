@@ -2,7 +2,21 @@
 # BosskuAI local backups
 .bosskuai-backups/
 
+# Raw Higgsfield renders (source frames/videos) — only the encoded output in public/ ships
+.assets-source/
+
 # Secrets — the Ollama API key lives here, never commit it
 .env
 .env.local
 .env.*.local
+
+# Review screenshots and retired/working 3D files stay local
+.bossku/shots/
+tools/ref/
+
+# Dependencies are restored from package-lock.json
+node_modules/
+__pycache__/
+
+# The local Python venv for the 3D pipeline is rebuilt per machine, never committed
+tools/hy3d-venv/

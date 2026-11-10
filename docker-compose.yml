@@ -1,6 +1,8 @@
-version: '3.8'
-
-# Local development: uses npm run dev (Vite dev server)
+# Local development: Vite with HMR for source only.
+# public/ (models, videos, draco) is baked into the image so Docker Desktop
+# does not serve multi-MB assets through the slow Windows bind mount.
+# After changing public/ media: docker compose up -d --build
+# (or: docker cp ./public/models/dragon-hero.glb portfolio-app:/app/public/models/)
 services:
   portfolio:
     build:
@@ -10,13 +12,13 @@ services:
     ports:
       - "5173:5173"
     volumes:
-      # Mount source for hot reload
-      - .:/app
-      - /app/node_modules  # keep node_modules from image, avoid overwriting
+      - ./src:/app/src
+      - ./index.html:/app/index.html
+      - ./vite.config.js:/app/vite.config.js
+      - ./package.json:/app/package.json
+      - /app/node_modules
     restart: unless-stopped
     environment:
       - NODE_ENV=development
-      # Use polling so file changes on host are detected in the container
       - CHOKIDAR_USEPOLLING=true
-      # Ollama Cloud key for the AI chatbot (set it in .env, never commit it)
       - OLLAMA_API_KEY=${OLLAMA_API_KEY:-}

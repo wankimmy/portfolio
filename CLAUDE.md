@@ -1,64 +1,37 @@
-# BosskuAI for Claude Code
+# BosskuAI
 
-<<<<<<< HEAD
-Use [`AGENTS.md`](AGENTS.md) as the canonical cross-tool contract. This file keeps Claude-specific deltas only.
-
-## Model Mapping
-=======
 **Instruction format:** This file is standard technical prose. The `bosskuai-caveman` skill compresses **assistant replies** only; it does not apply to interpreting or executing mandatory protocols, task routing, Definition of Done, security boundaries, or checklists defined here or in `AGENTS.md` (see that skill’s Auto-Clarity and workspace-instruction exception).
 
 Use `AGENTS.md` as **tool-neutral truth** for skill roster, quick ref, shared memory rules, success criteria.
 The root `AGENTS.md` `<claude-mem-context>` block is the workspace memory seed for Claude sessions; keep it in sync with shared memory when the handoff changes.
 
 **Dup on purpose:** This file = **Claude Code entry point** — repeats two-phase model split and core posture so Claude loads right defaults without opening `AGENTS.md` first. Full skill table, phased pipelines, future skills → **`AGENTS.md`**. Cursor rules → `.cursor/rules/bosskuai.mdc`. Codex naming → `.codex/AGENTS.md`.
->>>>>>> 3986c6126012ee6163546e682e439eb354c84b0e
 
-For meaningful tasks:
+## Bossku activation keyword
 
-<<<<<<< HEAD
-- Planning, architecture, and ambiguous analysis: `claude-opus-4-6`
-- Execution and implementation: `claude-sonnet-4-6`
-
-Trivial tasks may skip the two-phase split.
-=======
 If prompt has standalone word `bossku`, activate BosskuAI mode for that request.
 
 - Apply BosskuAI workspace rules before answer.
 - Classify task, auto-load minimum relevant local BosskuAI skills.
 - No need to name skill after `bossku` unless scope still ambiguous.
->>>>>>> 3986c6126012ee6163546e682e439eb354c84b0e
 
-## Claude Defaults
+## Model assignment (mandatory)
 
-<<<<<<< HEAD
-- Load the minimum relevant BosskuAI skill set from [`skill-index.json`](skill-index.json).
-- Ask clarification questions before broad multi-file changes when scope is unclear.
-- Keep routing and protocol chatter internal unless the user asks for it or a handoff needs it.
-- Use normal prose when clarity matters; terse output is fine when the task is straightforward.
-=======
 **Always use two-phase model split for meaningful tasks:**
->>>>>>> 3986c6126012ee6163546e682e439eb354c84b0e
 
-## Shared Memory
+| Phase | Model | Why |
+|-------|-------|-----|
+| Planning, architecture, strategy, analysis | `claude-opus-4-6` | Deepest reasoning, best for ambiguous/complex problems |
+| Implementation, execution, code generation | `claude-sonnet-4-6` | Fast, capable, cost-efficient for concrete tasks |
 
-<<<<<<< HEAD
-- Read [`ai-assistant/memory/active-continuation.md`](ai-assistant/memory/active-continuation.md) first when it contains live work.
-- If [`semantic-memory.sqlite3`](ai-assistant/memory/semantic-memory.sqlite3) exists, query it before opening broad memory files.
-- Follow [`ai-assistant/references/memory-first-handoff-protocol.md`](ai-assistant/references/memory-first-handoff-protocol.md) for durable writes.
-=======
 - NEVER skip planning phase on meaningful tasks.
 - Always enter plan mode first. State plan, get alignment, then execute.
 - Doubt → default to Opus 4.6 and plan.
 - Track phase/model internally; state model only for debug, handoff, model changes, risky tradeoffs.
 - Quick/trivial tasks (single-line fixes, lookups) may skip split.
->>>>>>> 3986c6126012ee6163546e682e439eb354c84b0e
 
-## References
+## Clarify first (ambiguity protocol)
 
-<<<<<<< HEAD
-- [`AGENTS.md`](AGENTS.md)
-- [`ai-assistant/references/workspace-layer-architecture.md`](ai-assistant/references/workspace-layer-architecture.md)
-=======
 **Mandatory gate:** Prompt general, ambiguous, or touches many files and scope unclear — stop and ask before acting.
 
 - Treat ambiguity as a hard stop.
@@ -188,4 +161,3 @@ Please answer: 1-yes/no  2-A/B/C  3-yes/no
 - Use `ai-assistant/memory/agent-profile.md` to customize active workspace for user's actual company/domain.
 - Use `ai-assistant/memory/project-understanding.md` to preserve durable understanding of project purpose and usually-relevant skills.
 - Something material not confirmed from code, docs, design, or current evidence → ask user. Don't guess.
->>>>>>> 3986c6126012ee6163546e682e439eb354c84b0e

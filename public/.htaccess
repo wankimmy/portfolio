@@ -1,0 +1,39 @@
+<IfModule mod_mime.c>
+  AddType text/css .css
+  AddType application/javascript .js .mjs
+  AddType application/wasm .wasm
+  AddType model/gltf-binary .glb
+  AddType font/woff2 .woff2
+</IfModule>
+
+<IfModule mod_headers.c>
+  # Stop advertising HTTP/3. QUIC/UDP 443 is often blocked on UK ISP and
+  # corporate networks, which yields HTML with no CSS/JS.
+  Header always unset Alt-Svc
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Ollama chat proxy (PHP) — keeps API key server-side on shared hosting
+  RewriteRule ^api/ollama/chat$ api/ollama/chat.php [L,QSA]
+
+  RewriteRule ^index\.html$ - [L]
+
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_URI} !^/api/
+  RewriteCond %{REQUEST_URI} !\.(?:js|mjs|css|map|json|svg|png|jpe?g|gif|webp|ico|woff2?|ttf|eot|wasm|glb|gltf)$ [NC]
+  RewriteRule . /index.html [L]
+</IfModule>
+
+<FilesMatch "^\.env">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>

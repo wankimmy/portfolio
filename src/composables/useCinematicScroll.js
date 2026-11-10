@@ -1,36 +1,23 @@
 import Lenis from 'lenis'
-
 import gsap from 'gsap'
 
 /**
- * Smooth scroll synced with GSAP ticker and ScrollTrigger.
- * @param {() => void} scrollTriggerUpdate
- * @returns {{ lenis: Lenis | null, destroy: () => void }}
+ * Lenis smooth scroll, driven by GSAP's ticker so scroll, ScrollTrigger and
+ * the WebGL layer all advance on one clock.
+ * @param {(lenis: Lenis) => void} onScroll
+ * @returns {{ lenis: Lenis, destroy: () => void }}
  */
-export function createCinematicScroll(scrollTriggerUpdate) {
-  const reduceMotion =
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-  if (reduceMotion) {
-    return {
-      lenis: null,
-      destroy: () => {},
-    }
-  }
-
+export function createCinematicScroll(onScroll) {
   const lenis = new Lenis({
-    duration: 1.25,
+    lerp: 0.085,
     smoothWheel: true,
-    wheelMultiplier: 1,
-    touchMultiplier: 1.55,
-    infinite: false,
+    touchMultiplier: 1.4,
+    autoRaf: false,
   })
 
-  lenis.on('scroll', scrollTriggerUpdate)
+  lenis.on('scroll', onScroll)
 
-  const ticker = (time) => {
-    lenis.raf(time * 1000)
-  }
+  const ticker = (time) => lenis.raf(time * 1000)
   gsap.ticker.add(ticker)
   gsap.ticker.lagSmoothing(0)
 
@@ -38,7 +25,6 @@ export function createCinematicScroll(scrollTriggerUpdate) {
     lenis,
     destroy: () => {
       gsap.ticker.remove(ticker)
-      lenis.off('scroll', scrollTriggerUpdate)
       lenis.destroy()
     },
   }

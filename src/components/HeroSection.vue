@@ -1,211 +1,149 @@
 <template>
-  <section id="home" ref="heroRoot" class="hero hero--cinematic hero--global-space-bg" aria-labelledby="hero-heading">
-    <div class="hero__bg" aria-hidden="true">
-      <div class="hero__galaxy"></div>
-      <div class="hero__starfield">
-        <span
-          v-for="(star, index) in heroStars"
-          :key="index"
-          class="hero__star"
-          :class="{ 'hero__star--twinkle': star.twinkle }"
-          :style="{
-            left: star.left + '%',
-            top: star.top + '%',
-            width: star.size + 'px',
-            height: star.size + 'px',
-            opacity: star.opacity,
-            animationDelay: star.delay + 's',
-          }"
-        />
-      </div>
-      <div class="hero__glow"></div>
+  <section id="home" ref="sectionRef" class="hero" aria-label="Intro">
+    <!-- the dragon's handle: drag here to spin it. Pointer-only extra. -->
+    <div ref="stageRef" class="hero__stage" :class="{ 'is-playable': worldReady }" aria-hidden="true">
+      <img
+        class="hero__poster"
+        :class="{ 'is-hidden': worldReady }"
+        src="/images/hero-dragon-poster.webp"
+        alt=""
+        width="1600"
+        height="1120"
+        fetchpriority="high"
+      />
     </div>
 
-    <div class="hero__inner hero__pin-target">
-      <header class="hero__copy hero__lift">
-        <p class="hero__greeting">Hi, I'm Safwan Hakim</p>
-        <p class="hero__role">Lv. 10 Software Manager · Full-Stack Developer</p>
+    <div ref="innerRef" class="hero__inner">
+      <p ref="labelRef" class="label hero__label">{{ profile.role }} · {{ profile.location }}</p>
 
-        <h1 id="hero-heading" class="hero__title">
-          <span class="hero__title-line">Every project is</span>
-          <span class="hero__title-line hero__title-line--accent">a new expedition.</span>
-        </h1>
-        <p class="hero__motto">“When one build ships, the next begins.”</p>
-        <br>
+      <h1 class="hero__title">
+        <span ref="nameRef" class="hero__name">Safwan Hakim</span>
+        <span ref="roleRef" class="hero__role"><em>World builder.</em></span>
+      </h1>
+
+      <div ref="footRef" class="hero__foot">
+        <p class="hero__lede">
+          Software tech lead and senior full-stack and AI engineer. {{ yearsWord }} years of quests across fintech,
+          ERP, e-commerce and property. Still taking new party members for client work.
+        </p>
         <div class="hero__actions">
-          <a class="button button--primary" href="#projects">▸ Begin quest</a>
-          <a class="button button--ghost" href="mailto:putrafyp@gmail.com">Contact me</a>
+          <a
+            class="btn btn--gold"
+            :href="whatsappLink('Hi Safwan, I have a quest for you!')"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Start a quest
+          </a>
+          <a class="btn btn--line" href="#projects">View completed quests</a>
         </div>
-
-        <nav class="hero__social" aria-label="Social and contact">
-          <a class="hero__social-link" href="mailto:putrafyp@gmail.com" aria-label="Email">
-            <svg class="hero__social-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path
-                d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"
-              />
-            </svg>
-          </a>
-          <a
-            class="hero__social-link"
-            href="https://www.linkedin.com/in/safwan-hakim/"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="LinkedIn"
-          >
-            <svg class="hero__social-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path
-                d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.07 2.07 0 01-2.064-2.063 2.072 2.072 0 114.147 0 2.07 2.07 0 01-2.083 2.063zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"
-              />
-            </svg>
-          </a>
-          <a
-            class="hero__social-link"
-            href="https://github.com/wankimmy"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="GitHub"
-          >
-            <svg class="hero__social-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path
-                d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"
-              />
-            </svg>
-          </a>
-        </nav>
-      </header>
-
-      <div class="hero__planet hero__scale">
-        <GameWorld3D
-          ref="earthRef"
-          class="hero__planet-canvas"
-          @ready="$emit('earth-ready')"
-          @error="$emit('earth-error')"
-        />
       </div>
+
+      <dl ref="statsRef" class="hero__stats">
+        <div>
+          <dt>Level</dt>
+          <dd>{{ profile.level }}</dd>
+        </div>
+        <div>
+          <dt>Class</dt>
+          <dd>Tech lead</dd>
+        </div>
+        <div>
+          <dt>Play time</dt>
+          <dd>{{ profile.years }} years</dd>
+        </div>
+        <div>
+          <dt>Realms</dt>
+          <dd>Fintech / ERP / AI</dd>
+        </div>
+      </dl>
     </div>
+
+    <p v-if="worldReady" class="hero__hint" aria-hidden="true">Drag to spin the dragon</p>
   </section>
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { inject, onMounted, onUnmounted, ref, watch } from 'vue'
 import gsap from 'gsap'
+import { SplitText } from 'gsap/SplitText'
 
-import GameWorld3D from './GameWorld3D.vue'
+import { profile, whatsappLink } from '../content.js'
 
-defineEmits(['earth-ready', 'earth-error'])
+const props = defineProps({
+  worldReady: { type: Boolean, default: false },
+  /** false while the title screen is up */
+  entered: { type: Boolean, default: false },
+})
 
-const frac = (n) => n - Math.floor(n)
+const site = inject('site')
+const yearsWord = 'Nine'
 
-const buildHeroStars = (count) => {
-  const stars = []
-  for (let index = 0; index < count; index += 1) {
-    const r1 = frac(Math.sin(index * 12.9898) * 43758.5453)
-    const r2 = frac(Math.sin(index * 78.233 + 1) * 43758.5453)
-    const r3 = frac(Math.sin(index * 37.719 + 2) * 43758.5453)
-    stars.push({
-      left: r1 * 100,
-      top: r2 * 100,
-      size: r3 > 0.94 ? 2.35 : r3 > 0.72 ? 1.3 : 0.55,
-      opacity: 0.18 + r2 * 0.62,
-      twinkle: r3 > 0.66,
-      delay: r1 * 7,
+const sectionRef = ref(null)
+const stageRef = ref(null)
+const innerRef = ref(null)
+const labelRef = ref(null)
+const nameRef = ref(null)
+const roleRef = ref(null)
+const footRef = ref(null)
+const statsRef = ref(null)
+
+let ctx = null
+let unbindDrag = () => {}
+let introPlayed = false
+
+/** World first (the dragon flies in from App), type second, chrome last. Under 1.4s. */
+const playIntro = () => {
+  if (introPlayed || !sectionRef.value) return
+  introPlayed = true
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+  ctx = gsap.context(() => {
+    const name = SplitText.create(nameRef.value, { type: 'chars', mask: 'chars' })
+    const role = SplitText.create(roleRef.value, { type: 'lines', mask: 'lines' })
+    const rest = [labelRef.value, footRef.value, statsRef.value]
+
+    gsap
+      .timeline({
+        defaults: { ease: 'expo.out' },
+        onComplete: () => {
+          name.revert()
+          role.revert()
+        },
+      })
+      .from(name.chars, { yPercent: 110, duration: 1, stagger: 0.03 }, 0.15)
+      .from(role.lines, { yPercent: 110, duration: 1 }, 0.4)
+      .from(rest, { autoAlpha: 0, y: 20, duration: 0.8, stagger: 0.07, clearProps: 'all' }, 0.6)
+
+    // the copy lets go as the hero scrolls away; the dragon stays for the next chapter
+    gsap.to(innerRef.value, {
+      yPercent: -10,
+      autoAlpha: 0,
+      ease: 'none',
+      scrollTrigger: { trigger: sectionRef.value, start: 'top top', end: 'bottom 25%', scrub: true },
     })
-  }
-  return stars
+  }, sectionRef.value)
 }
 
-const heroStars = buildHeroStars(340)
+watch(
+  () => props.entered,
+  (entered) => entered && playIntro(),
+)
 
-const heroRoot = ref(null)
-const earthRef = ref(null)
-let ctx
-
-let landingIntroRan = false
-
-/** @param {{ instant?: boolean } | undefined} options */
-function startLandingReveal(options) {
-  const instant = Boolean(options?.instant)
-  const root = heroRoot.value
-  if (!root || landingIntroRan) {
-    return
-  }
-  landingIntroRan = true
-
-  ctx?.revert()
-
-  const reduceMotion =
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-  ctx = gsap.context(() => {
-    if (instant || reduceMotion) {
-      gsap.set(['.hero__galaxy', '.hero__starfield', '.hero__glow'], {
-        opacity: 1,
-        clearProps: 'opacity',
-      })
-      gsap.set(['.hero__copy', '.hero__social'], { opacity: 1, y: 0 })
-      gsap.set('.hero__planet', { opacity: 1, scale: 1 })
-      return
-    }
-
-    const timeline = gsap.timeline({ defaults: { ease: 'power3.out' } })
-    timeline
-      .fromTo('.hero__galaxy', { opacity: 0 }, { opacity: 1, duration: 1.05, ease: 'power2.out' })
-      .fromTo('.hero__starfield', { opacity: 0 }, { opacity: 1, duration: 0.95, ease: 'power2.out' }, '-=0.95')
-      .fromTo(
-        '.hero__glow',
-        { opacity: 0.15 },
-        { opacity: 0.92, duration: 1 },
-        '-=1'
-      )
-      .fromTo('.hero__copy', { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 1 }, '-=0.78')
-      .fromTo(
-        '.hero__planet',
-        { opacity: 0, scale: 0.9 },
-        { opacity: 1, scale: 1, duration: 1.15, ease: 'power2.out' },
-        '-=0.85'
-      )
-      .fromTo(
-        '.hero__social',
-        { opacity: 0, y: 16 },
-        { opacity: 1, y: 0, duration: 0.5 },
-        '-=0.55'
-      )
-  }, root)
-}
-
-function primeLandingHidden() {
-  const root = heroRoot.value
-  if (!root) {
-    return
-  }
-  const reduceMotion =
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  ctx?.revert()
-  ctx = gsap.context(() => {
-    if (!reduceMotion) {
-      gsap.set(['.hero__galaxy', '.hero__starfield', '.hero__glow'], {
-        opacity: 0,
-      })
-      gsap.set(['.hero__copy', '.hero__social'], { opacity: 0, y: 36 })
-      gsap.set('.hero__planet', { opacity: 0, scale: 0.92 })
-    }
-  }, root)
-}
+watch(
+  () => props.worldReady,
+  (ready) => {
+    unbindDrag()
+    unbindDrag = ready && stageRef.value ? site.bindDragonDrag(stageRef.value) : () => {}
+  },
+)
 
 onMounted(() => {
-  primeLandingHidden()
+  if (props.entered) playIntro()
 })
 
-function setEarthCinematicProgress(progress) {
-  earthRef.value?.setCinematicProgress?.(progress)
-}
-
-defineExpose({
-  startLandingReveal,
-  setEarthCinematicProgress,
-})
-
-onBeforeUnmount(() => {
-  ctx?.revert?.()
+onUnmounted(() => {
+  unbindDrag()
+  ctx?.revert()
 })
 </script>

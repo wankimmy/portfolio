@@ -1,88 +1,25 @@
 <template>
-  <section id="certificates" class="section section--panel">
-    <div class="section__inner">
-      <div class="section-heading section-heading--split reveal">
-        <div>
-          <p class="section-kicker">Achievements</p>
-          <h2 class="section-title">Achievements unlocked between quests.</h2>
-        </div>
-        <p class="section-index">04</p>
-      </div>
+  <section id="certificates" class="section trophies">
+    <div class="wrap">
+      <header class="section__head">
+        <p class="label">Trophies</p>
+        <h2 class="h2" data-split>Certifications earned along the way.</h2>
+      </header>
 
-      <div class="cert-grid">
-        <article
-          v-for="cert in certificates"
-          :key="cert.id"
-          class="cert-card tilt-card reveal"
-          :style="{ '--cert-glow': cert.glow }"
-        >
-          <div class="cert-card__ambient" aria-hidden="true"></div>
-          <div class="gilt-frame" aria-hidden="true"></div>
-          <div class="cert-card__overlay" aria-hidden="true"></div>
-          <div class="cert-card__content">
-            <span class="cert-card__icon">{{ cert.icon }}</span>
-            <p class="cert-card__issuer">{{ cert.issuer }}</p>
-            <h3>{{ cert.name }}</h3>
-            <p class="cert-card__date">Unlocked {{ cert.date }}</p>
-            <p class="cert-card__description">{{ cert.description }}</p>
-            <a
-              v-if="cert.file"
-              class="text-link cert-card__link"
-              :href="cert.file"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              View credential
-            </a>
-            <p v-else class="cert-card__note">Credential available on request.</p>
-          </div>
-        </article>
-      </div>
+      <ul class="trophies__list" data-reveal-group>
+        <li v-for="cert in certificates" :key="cert.name" class="trophy">
+          <span class="trophy__year">{{ cert.year }}</span>
+          <h3 class="trophy__name">{{ cert.name }}</h3>
+          <span class="trophy__issuer">{{ cert.issuer }}</span>
+          <a class="link" :href="cert.file" target="_blank" rel="noopener noreferrer">
+            View credential<span class="sr-only">: {{ cert.name }} (PDF)</span>
+          </a>
+        </li>
+      </ul>
     </div>
   </section>
 </template>
 
 <script setup>
-const certificates = [
-  {
-    id: 1,
-    name: 'Web Application Hacking and Defense',
-    issuer: 'Condition Zebra',
-    date: '2024',
-    description: 'Hands-on security training for web apps.',
-    icon: 'SEC',
-    file: '/assets/R001174-Safwan-Hakim-Bin-Yacob.pdf',
-    glow: 'radial-gradient(circle at top left, rgba(176, 128, 52, 0.2), transparent 60%)',
-  },
-  {
-    id: 2,
-    name: 'OWASP Security Foundation',
-    issuer: 'OWASP Foundation',
-    date: '2022',
-    description: 'Core web security basics and safe coding practice.',
-    icon: 'APP',
-    file: '/assets/Safwan_Hakim_owasp.pdf',
-    glow: 'radial-gradient(circle at top right, rgba(20, 144, 173, 0.16), transparent 62%)',
-  },
-  {
-    id: 3,
-    name: 'IoT Security Certification',
-    issuer: 'Tertiary Courses',
-    date: '2021',
-    description: 'Basic security for connected devices and communication.',
-    icon: 'IOT',
-    file: '/assets/E-cert_IoT_Security_Safwan_Hakim.pdf',
-    glow: 'radial-gradient(circle at center, rgba(176, 128, 52, 0.14), transparent 58%)',
-  },
-  {
-    id: 4,
-    name: 'Industry 4.0 E-Certification',
-    issuer: 'Tertiary Courses',
-    date: '2021',
-    description: 'Basic knowledge of automation, IoT, and digital systems.',
-    icon: 'IR4',
-    file: '/assets/IR4.0_E-Cert_Safwan_Hakim_Bin_Yacob.pdf',
-    glow: 'radial-gradient(circle at bottom right, rgba(20, 144, 173, 0.14), transparent 64%)',
-  },
-]
+import { certificates } from '../content.js'
 </script>

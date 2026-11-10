@@ -1,98 +1,65 @@
 <template>
-  <section id="about" class="section section--panel">
-    <div class="section__inner">
-      <div class="section-heading section-heading--split reveal">
-        <div>
-          <p class="section-kicker">Character profile</p>
-          <h2 class="section-title">I like building products that are useful for the community.</h2>
+  <section id="about" ref="sectionRef" class="section status">
+    <div class="wrap">
+      <header class="section__head">
+        <p class="label">Status</p>
+        <h2 class="h2" data-split>I like building products that are useful for the community.</h2>
+      </header>
+
+      <div class="status__grid">
+        <div class="status__story">
+          <p ref="leadRef" class="status__lead">
+            I do not just write code. I think about the full product: the design, the flow, the system behind it,
+            how people use it and how you want to sell it.
+          </p>
+          <p data-reveal>
+            Over the years, I have worked as a software engineer and a manager. I still like solving real problems
+            and keeping things done.
+          </p>
+          <p class="status__motto" data-reveal><em>Cheap cheap no good, good good no cheap.</em></p>
+
+          <ul class="status__rules" data-reveal-group>
+            <li v-for="rule in principles" :key="rule.name">
+              <strong>{{ rule.name }}</strong>
+              <span>{{ rule.copy }}</span>
+            </li>
+          </ul>
         </div>
-        <p class="section-index">00</p>
-      </div>
 
-      <div class="char-layout">
-        <!-- FF-style status screen -->
-        <article ref="statusCardRef" class="char-card tilt-card reveal">
-          <div class="gilt-frame" aria-hidden="true"></div>
-
-          <header class="char-card__header">
-            <span class="char-card__avatar" aria-hidden="true">SH</span>
-            <div class="char-card__id">
-              <h3 class="char-card__name">Safwan Hakim</h3>
-              <p class="char-card__class">Engineer · Software Manager</p>
+        <aside ref="sheetRef" class="sheet" aria-label="Character sheet" data-reveal>
+          <header class="sheet__head">
+            <span class="sheet__avatar" aria-hidden="true">SH</span>
+            <div>
+              <h3 class="sheet__name">{{ profile.name }}</h3>
+              <p class="sheet__class">{{ profile.role }} · Confidential (property)</p>
+              <p class="label">Level {{ profile.level }} · Class: Builder</p>
             </div>
-            <span class="char-card__level">Lv.<strong>10</strong></span>
           </header>
 
-          <div class="char-card__vitals">
-            <div class="char-vital">
-              <span class="char-vital__label">HP</span>
-              <span class="char-vital__track">
-                <span class="char-vital__fill char-vital__fill--hp" style="--vital: 100%"></span>
-              </span>
-              <span class="char-vital__value">9999 / 9999</span>
-            </div>
-            <div class="char-vital">
-              <span class="char-vital__label">MP</span>
-              <span class="char-vital__track">
-                <span class="char-vital__fill char-vital__fill--mp" style="--vital: 86%"></span>
-              </span>
-              <span class="char-vital__value">860 / 999</span>
-            </div>
-          </div>
-
-          <dl class="char-card__stats">
-            <div v-for="stat in stats" :key="stat.label" class="char-stat">
-              <dt>
-                <span class="char-stat__abbr">{{ stat.abbr }}</span>
-                <span class="char-stat__label">{{ stat.label }}</span>
-              </dt>
-              <dd>{{ stat.value }}</dd>
+          <dl class="sheet__stats">
+            <div v-for="stat in stats" :key="stat.label" class="stat">
+              <dt>{{ stat.label }}</dt>
+              <dd>
+                <span class="stat__value">{{ stat.value }}</span>
+                <span class="stat__track" aria-hidden="true">
+                  <span class="stat__fill" :style="{ '--fill': stat.value / 100 }"></span>
+                </span>
+              </dd>
             </div>
           </dl>
 
-          <p class="char-card__exp">
-            <span>EXP 59,100</span>
-            <span>Next: ship more useful products</span>
-          </p>
-        </article>
-
-        <!-- Story + equipped traits -->
-        <div class="char-story">
-          <div ref="traitsCardRef" class="about-card tilt-card about-card--how-work reveal">
-            <div class="about-card__header">
-              <p class="about-card__eyebrow">Equipped traits</p>
+          <dl class="sheet__facts">
+            <div>
+              <dt>Languages</dt>
+              <dd>{{ profile.languages.join(', ') }}</dd>
             </div>
-
-            <div class="about-values">
-              <div class="about-value">
-                <strong>✦ Keep it simple</strong>
-                <span>Simple is better than complex.</span>
-              </div>
-              <div class="about-value">
-                <strong>✦ Keep it nice</strong>
-                <span>Beautiful design and smooth user experience.</span>
-              </div>
-              <div class="about-value">
-                <strong>✦ Keep it useful</strong>
-                <span>Every feature should help the user, not add noise.</span>
-              </div>
+            <div v-for="school in profile.education" :key="school.what">
+              <dt>{{ school.when }}</dt>
+              <dd>{{ school.what }}, {{ school.where }}</dd>
             </div>
-          </div>
-        </div>
+          </dl>
+        </aside>
       </div>
-
-      <blockquote class="char-quote reveal">
-        <span class="char-quote__mark" aria-hidden="true">&ldquo;</span>
-        <p>
-          I do not just write code. I think about the full product: the design, the flow, the
-          system behind it, how people use it and how you want to sell it.
-        </p>
-        <p>
-          Over the years, I have worked as a software engineer and a manager. I still like
-          solving real problems and keeping things done.
-        </p>
-        <p class="char-quote__highlight">I like building products that are useful for the community.</p>
-      </blockquote>
     </div>
   </section>
 </template>
@@ -100,69 +67,49 @@
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue'
 import gsap from 'gsap'
-import { bindCardTilt } from '../composables/useCardTilt.js'
+import { SplitText } from 'gsap/SplitText'
 
-const statusCardRef = ref(null)
-const traitsCardRef = ref(null)
-let unbindTraitsTilt = () => {}
-let ctx
+import { principles, profile, stats } from '../content.js'
 
-const stats = [
-  { abbr: 'STR', label: 'Backend', value: 95 },
-  { abbr: 'DEX', label: 'Frontend', value: 92 },
-  { abbr: 'INT', label: 'Architecture', value: 90 },
-  { abbr: 'WIS', label: 'Code review', value: 93 },
-  { abbr: 'CHA', label: 'Team leading', value: 88 },
-  { abbr: 'LCK', label: 'Shipping on time', value: 97 },
-]
+const sectionRef = ref(null)
+const leadRef = ref(null)
+const sheetRef = ref(null)
+let mm = null
 
 onMounted(() => {
-  unbindTraitsTilt = bindCardTilt(traitsCardRef.value)
-
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  if (reduceMotion || !statusCardRef.value) {
-    return
-  }
-
-  // Vitals + stat values play once when the status card scrolls into view
-  ctx = gsap.context(() => {
-    const fills = gsap.utils.toArray('.char-vital__fill')
-    const statValues = gsap.utils.toArray('.char-stat dd')
-
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger: statusCardRef.value,
-        start: 'top 82%',
-        once: true,
+  mm = gsap.matchMedia()
+  mm.add('(prefers-reduced-motion: no-preference)', () => {
+    // the lead paragraph lights up word by word as you read down it
+    const split = SplitText.create(leadRef.value, { type: 'words' })
+    gsap.fromTo(
+      split.words,
+      { opacity: 0.22 },
+      {
+        opacity: 1,
+        ease: 'none',
+        stagger: 0.08,
+        scrollTrigger: { trigger: leadRef.value, start: 'top 82%', end: 'bottom 48%', scrub: true },
       },
-    })
+    )
 
-    tl.fromTo(fills, { scaleX: 0 }, { scaleX: 1, duration: 1.1, ease: 'power3.out', stagger: 0.15 })
+    // bars are full by default; they only empty in the frame they start to fill
+    const fills = sheetRef.value.querySelectorAll('.stat__fill')
+    gsap.fromTo(
+      fills,
+      { scaleX: 0 },
+      {
+        scaleX: 1,
+        duration: 1.1,
+        ease: 'expo.out',
+        stagger: 0.07,
+        immediateRender: false,
+        scrollTrigger: { trigger: sheetRef.value, start: 'top 78%', once: true },
+      },
+    )
 
-    statValues.forEach((el, index) => {
-      const target = Number(el.textContent)
-      if (!Number.isFinite(target)) {
-        return
-      }
-      const counter = { value: 0 }
-      tl.to(
-        counter,
-        {
-          value: target,
-          duration: 0.9,
-          ease: 'power2.out',
-          onUpdate: () => {
-            el.textContent = String(Math.round(counter.value))
-          },
-        },
-        0.25 + index * 0.07,
-      )
-    })
-  }, statusCardRef.value)
+    return () => split.revert()
+  })
 })
 
-onUnmounted(() => {
-  unbindTraitsTilt()
-  ctx?.revert()
-})
+onUnmounted(() => mm?.revert())
 </script>

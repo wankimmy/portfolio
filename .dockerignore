@@ -7,6 +7,13 @@ yarn-error.log
 dist
 .vite
 
+# Heavy local AI / 3D tooling (never needed in the web image)
+tools/hy3d-venv
+tools/Hunyuan3D-2
+tools/ref
+**/*.blend
+**/*.blend1
+
 # Git
 .git
 .gitignore
@@ -44,3 +51,5 @@ coverage
 # Misc
 .cursor
 *.plan.md
+.playwright-mcp
+agent-transcripts

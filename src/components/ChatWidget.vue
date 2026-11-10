@@ -7,7 +7,7 @@
         class="chat-widget__hint"
         @click="openChat"
       >
-        Speak with my companion ✦
+        Talk with my AI
       </button>
     </transition>
 
@@ -44,10 +44,10 @@
       <header class="chat-panel__header">
         <span class="chat-panel__avatar" aria-hidden="true">SH</span>
         <div class="chat-panel__heading">
-          <p class="chat-panel__title">Party Companion</p>
+          <p class="chat-panel__title">Safwan AI</p>
           <p class="chat-panel__status">
             <span class="chat-panel__dot" aria-hidden="true"></span>
-            In your party · powered by Gemma 4
+            AI tech advisor · powered by Gemma 4
           </p>
         </div>
         <button type="button" class="chat-panel__close" aria-label="Close chat" @click="closeChat">
@@ -92,7 +92,7 @@
           v-model="draft"
           class="chat-panel__input"
           rows="1"
-          placeholder="Ask about services, pricing, anything…"
+          placeholder="Ask about skills, AI, pricing, project idea..."
           :disabled="isStreaming"
           @keydown.enter.exact.prevent="submitDraft"
         ></textarea>
@@ -121,21 +121,20 @@ const GREETING = {
   id: 'greeting',
   role: 'assistant',
   content:
-    "Well met, traveler! I'm Safwan's party companion. Ask me about his quests, services, or item-shop prices — or just say hi.",
+    "Hi, I’m Safwan AI. Ask me about Safwan’s experience, stack, services, pricing, AI ideas, or whether your project idea can build or not lah.",
 }
 
 const FALLBACK_REPLY =
-  "Hmm, I can't reach my brain right now. You can message Safwan directly on WhatsApp at wa.me/60177786836 — he replies fast!"
+  "Aiyo, I can't reach my brain right now. You can WhatsApp Safwan directly at wa.me/60177786836, easier to discuss there."
 
 const suggestions = [
-  'What services do you offer?',
-  'How much for an online store?',
-  'Can you build AI chatbots?',
+  'What is Safwan good at?',
+  'Can advise my AI idea?',
+  'How much for web app?',
 ]
 
 const isOpen = ref(false)
 const showHint = ref(false)
-const hasOpenedOnce = ref(false)
 const draft = ref('')
 const messages = ref([GREETING])
 const isStreaming = ref(false)
@@ -180,7 +179,6 @@ const animatePanel = (open) => {
 
 const openChat = async () => {
   showHint.value = false
-  hasOpenedOnce.value = true
   isOpen.value = true
   await nextTick()
   animatePanel(true)
@@ -192,6 +190,7 @@ const closeChat = () => {
   const panel = panelRef.value
   if (!panel || reduceMotion) {
     isOpen.value = false
+    showHint.value = true
     return
   }
   gsap.killTweensOf(panel)
@@ -203,6 +202,7 @@ const closeChat = () => {
     ease: 'power2.in',
     onComplete: () => {
       isOpen.value = false
+      showHint.value = true
       gsap.set(panel, { clearProps: 'all' })
     },
   })
@@ -283,10 +283,10 @@ const submitDraft = () => {
 onMounted(() => {
   reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   hintTimer = window.setTimeout(() => {
-    if (!hasOpenedOnce.value) {
+    if (!isOpen.value) {
       showHint.value = true
     }
-  }, 4000)
+  }, 1800)
 
   if (!reduceMotion && launcherRef.value) {
     gsap.fromTo(

@@ -1,74 +1,64 @@
 <template>
-  <section id="pricing" ref="sectionRef" class="section section--panel">
-    <div class="section__inner">
-      <div class="section-heading section-heading--split reveal">
-        <div>
-          <p class="section-kicker">Item shop</p>
-          <h2 class="section-title">Honest pricing, no hidden traps.</h2>
-        </div>
-        <p class="section-index">03</p>
-      </div>
+  <section id="pricing" ref="sectionRef" class="section shop">
+    <div class="wrap">
+      <header class="section__head">
+        <p class="label">Shop</p>
+        <h2 class="h2" data-split>Honest pricing, no hidden traps.</h2>
+      </header>
 
-      <div class="pricing-grid">
-        <article
-          v-for="plan in plans"
-          :key="plan.name"
-          class="pricing-card tilt-card"
-          :class="{ 'pricing-card--popular': plan.popular }"
-        >
-          <div class="gilt-frame" aria-hidden="true"></div>
-          <span v-if="plan.popular" class="pricing-card__badge">★ Party favourite</span>
-          <span class="pricing-card__item">✦ {{ plan.item }}</span>
-          <p class="pricing-card__name">{{ plan.name }}</p>
-          <p class="pricing-card__tagline">{{ plan.tagline }}</p>
-          <p class="pricing-card__price">
-            <span class="pricing-card__from">from</span>
-            <span class="pricing-card__currency">RM</span>
-            <span class="pricing-card__amount" :data-price="plan.price">{{
-              formatPrice(plan.price)
-            }}</span>
-          </p>
-          <ul class="pricing-card__features">
+      <ul class="shop__list" data-reveal-group>
+        <li v-for="plan in plans" :key="plan.name" class="plan" :class="{ 'plan--popular': plan.popular }">
+          <div class="plan__name">
+            <p v-if="plan.popular" class="label plan__flag">Most popular</p>
+            <h3>{{ plan.name }}</h3>
+            <p class="plan__tagline">{{ plan.tagline }}</p>
+          </div>
+          <ul class="plan__features">
             <li v-for="feature in plan.features" :key="feature">{{ feature }}</li>
           </ul>
-          <a
-            class="button pricing-card__cta"
-            :class="plan.popular ? 'button--primary' : 'button--ghost'"
-            :href="whatsappLink(plan.name)"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {{ plan.cta }}
-          </a>
-        </article>
-      </div>
+          <div class="plan__buy">
+            <p class="plan__price">
+              <span class="plan__from">from RM</span>
+              <span class="plan__amount" :data-price="plan.price">{{ formatPrice(plan.price) }}</span>
+            </p>
+            <a
+              class="btn"
+              :class="plan.popular ? 'btn--gold' : 'btn--line'"
+              :href="whatsappLink(`Hi Safwan, I'm interested in the ${plan.name} package from your portfolio.`)"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {{ plan.cta }}
+            </a>
+          </div>
+        </li>
 
-      <aside class="pricing-care tilt-card reveal">
-        <div class="pricing-care__info">
-          <p class="pricing-care__name">✦ Regen — Care Plan</p>
-          <p class="pricing-care__copy">
-            Already have a site? I keep it healthy — hosting, updates, backups, and small tweaks
-            handled for you.
-          </p>
-        </div>
-        <p class="pricing-care__price">
-          <span class="pricing-card__currency">RM</span>
-          <span class="pricing-card__amount" data-price="200">{{ formatPrice(200) }}</span>
-          <span class="pricing-care__period">/month</span>
-        </p>
-        <a
-          class="button button--ghost button--compact"
-          :href="whatsappLink('Care Plan')"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Ask about care
-        </a>
-      </aside>
+        <li class="plan plan--care">
+          <div class="plan__name">
+            <h3>{{ carePlan.name }}</h3>
+          </div>
+          <p class="plan__care-copy">{{ carePlan.copy }}</p>
+          <div class="plan__buy">
+            <p class="plan__price">
+              <span class="plan__from">RM</span>
+              <span class="plan__amount" :data-price="carePlan.price">{{ formatPrice(carePlan.price) }}</span>
+              <span class="plan__from">/ month</span>
+            </p>
+            <a
+              class="btn btn--line"
+              :href="whatsappLink(`Hi Safwan, I'm interested in the ${carePlan.name} from your portfolio.`)"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Ask about care
+            </a>
+          </div>
+        </li>
+      </ul>
 
-      <p class="pricing-note reveal">
-        Prices are starting estimates in MYR — every quest is scoped honestly after a free chat.
-        Student or non-profit? Talk to me, I'm flexible. No gil accepted (yet).
+      <p class="shop__note" data-reveal>
+        Prices are starting estimates in MYR, and every project is scoped honestly after a free chat. Student or
+        non-profit? Talk to me, I'm flexible.
       </p>
     </div>
   </section>
@@ -77,102 +67,43 @@
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue'
 import gsap from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
+
+import { carePlan, plans, whatsappLink } from '../content.js'
 
 const sectionRef = ref(null)
-let ctx
-
-const plans = [
-  {
-    name: 'Starter Website',
-    item: 'Potion',
-    tagline: 'For small businesses that need to look good online.',
-    price: 1500,
-    popular: false,
-    cta: 'Start a website',
-    features: [
-      'Up to 5 custom-designed pages',
-      'Mobile-friendly & fast loading',
-      'Basic SEO & analytics setup',
-      'WhatsApp & contact integration',
-      'Delivered in 1–2 weeks',
-      '1 month of free support',
-    ],
-  },
-  {
-    name: 'Business Web App',
-    item: 'Hi-Potion',
-    tagline: 'Online stores, bookings, and custom dashboards.',
-    price: 4500,
-    popular: true,
-    cta: 'Build my app',
-    features: [
-      'Custom Laravel / Vue build',
-      'Payment gateway (FPX, cards, e-wallets)',
-      'Admin dashboard & reporting',
-      'Hosting & deployment included',
-      'Delivered in 4–6 weeks',
-      '2 months of free support',
-    ],
-  },
-  {
-    name: 'Custom System / MVP',
-    item: 'Elixir',
-    tagline: 'Turn your startup idea into a working product.',
-    price: 8000,
-    popular: false,
-    cta: 'Discuss my idea',
-    features: [
-      'Full SaaS MVP with user accounts',
-      'AI features & API integrations',
-      'Docker-based cloud deployment',
-      'Security review included',
-      'Roadmap & architecture advice',
-      '3 months of free support',
-    ],
-  },
-]
+let mm = null
 
 const formatPrice = (value) => value.toLocaleString('en-MY')
 
-const whatsappLink = (plan) =>
-  `https://wa.me/60177786836?text=${encodeURIComponent(
-    `Hi Safwan, I'm interested in the ${plan} package from your portfolio.`,
-  )}`
-
 onMounted(() => {
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  if (reduceMotion || !sectionRef.value) {
-    return
-  }
-
-  ctx = gsap.context(() => {
-    gsap.utils.toArray('.pricing-card__amount').forEach((el) => {
+  mm = gsap.matchMedia()
+  mm.add('(prefers-reduced-motion: no-preference)', () => {
+    // Prices tick up once, the first time each one is on screen. The real price
+    // is in the markup; it is only zeroed as the row crosses the bottom edge.
+    gsap.utils.toArray('.plan__amount', sectionRef.value).forEach((el) => {
       const target = Number(el.dataset.price)
-      if (!Number.isFinite(target)) {
-        return
-      }
       const counter = { value: 0 }
+      ScrollTrigger.create({
+        trigger: el,
+        start: 'top bottom',
+        once: true,
+        onEnter: () => {
+          el.textContent = '0'
+        },
+      })
       gsap.to(counter, {
         value: target,
-        duration: 1.4,
-        ease: 'power2.out',
-        scrollTrigger: {
-          trigger: el,
-          start: 'top 88%',
-          once: true,
-        },
+        duration: 1.2,
+        ease: 'expo.out',
+        scrollTrigger: { trigger: el, start: 'top 88%', once: true },
         onUpdate: () => {
           el.textContent = formatPrice(Math.round(counter.value))
         },
-        onComplete: () => {
-          el.textContent = formatPrice(target)
-        },
       })
     })
-  }, sectionRef.value)
+  })
 })
 
-onUnmounted(() => {
-  ctx?.revert()
-})
+onUnmounted(() => mm?.revert())
 </script>
