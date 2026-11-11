@@ -170,9 +170,14 @@ export function createWorld(canvas, options) {
       }
       const hw = (box.width / viewW) * halfW
       const hh = (height / viewH) * halfH
+      // a creature may reach further above its centre than below (raised wings):
+      // fit and centre that whole envelope, so nothing pokes out of the top of the box
+      const up = creature.reach?.up ?? creature.size.y / 2
+      const down = creature.reach?.down ?? creature.size.y / 2
+      const boxFit = Math.min((2 * hw) / creature.size.x, (2 * hh) / (up + down))
       const bx = (((box.left + box.width / 2) / viewW) * 2 - 1) * halfW + pose.x * hw
-      const by = (1 - ((top + height / 2) / viewH) * 2) * halfH + pose.y * hh
-      const boxFit = Math.min((2 * hw) / creature.size.x, (2 * hh) / creature.size.y)
+      const by =
+        (1 - ((top + height / 2) / viewH) * 2) * halfH + pose.y * hh - ((up - down) / 2) * boxFit * pose.scale
       x += (bx - x) * pose.stage
       y += (by - y) * pose.stage
       fit += (boxFit - fit) * pose.stage

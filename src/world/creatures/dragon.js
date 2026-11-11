@@ -6,6 +6,11 @@ import { applyHideMaterials } from '../dragonLook.js'
 import { createFlight } from '../dragonFlight.js'
 
 const FLAP_HEADROOM = 1.35 // raised wings stand this much taller than the rest pose
+// How far the animal reaches above and below its centre at the top of a hard
+// wing beat, in model units (wingspan 2), read off the test stage at energy 1.
+// The raised tips go far higher than the feet hang, so a box fit centres this
+// envelope, not the rest pose.
+const REACH = { up: 0.9, down: 0.46 }
 
 /**
  * @param {typeof import('three')} THREE
@@ -57,6 +62,7 @@ export async function createCreature(THREE, { envMap, lite, modelUrl, onProgress
   return {
     group,
     size: { x: size.x, y: size.y * FLAP_HEADROOM },
+    reach: REACH,
     update: (_time, dt, energy) => flight.update(dt, energy),
     dispose() {},
   }

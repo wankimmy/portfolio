@@ -76,7 +76,7 @@ try {
     modelUrl: `/models/dragon-hero${lite ? '-lite' : ''}.glb`,
   })
   if (!creature?.group || !creature.size || typeof creature.update !== 'function') {
-    throw new Error('createCreature must return { group, size: { x, y }, update(time, dt, energy), dispose() }')
+    throw new Error('createCreature must return { group, size: { x, y }, update(time, dt, energy), dispose() } (optional: reach: { up, down })')
   }
 
   const rig = new THREE.Group()

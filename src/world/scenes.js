@@ -39,7 +39,7 @@ export const SCENES = {
     contact: { veil: 0.15, cast: { dragon: { x: 0.56, y: 0.5, scale: 0.56, yaw: -0.25, pitch: 0.22, roll: 0 } } },
   },
   tall: {
-    home: { veil: 0, cast: { dragon: { box: true, x: 0, y: -0.06, scale: 1.14, yaw: -0.16, pitch: 0.04, roll: 0 } } },
+    home: { veil: 0, cast: { dragon: { box: true, x: 0, y: 0, scale: 0.97, yaw: -0.16, pitch: 0.04, roll: 0 } } },
     about: { veil: 0.88, cast: {} },
     'encounter-naga': { veil: 0.1, cast: { naga: { box: true, x: 0, y: 0, scale: 1, yaw: 0, ...FLAT } } },
     tech: { veil: 0.86, cast: {} },
@@ -52,7 +52,7 @@ export const SCENES = {
     certificates: { veil: 0.9, cast: {} },
     'star-map': { veil: 0.92, cast: {} },
     // in front of the finished world, which sits behind it like a halo
-    contact: { veil: 0.2, cast: { dragon: { box: true, x: 0, y: 0.04, scale: 0.92, yaw: 0, pitch: 0.1, roll: 0 } } },
+    contact: { veil: 0.2, cast: { dragon: { box: true, x: 0, y: 0, scale: 0.94, yaw: 0, pitch: 0.1, roll: 0 } } },
   },
 }
 
