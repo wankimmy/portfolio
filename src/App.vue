@@ -55,7 +55,7 @@ import { chapters } from './content.js'
 import { buildReveals } from './motion/reveals.js'
 import { createWorld } from './world/createWorld.js'
 import { FORMATIONS } from './world/formations.js'
-import { isEncounter, PARK, SCENE_IDS, SCENES } from './world/scenes.js'
+import { isEncounter, OFF_SIDE, PARK, SCENE_IDS, SCENES, SIDE } from './world/scenes.js'
 import TitleScreen from './components/TitleScreen.vue'
 import SiteNav from './components/SiteNav.vue'
 import HeroSection from './components/HeroSection.vue'
@@ -99,6 +99,7 @@ let motionCtx = null
 let entrancePlayed = false
 let wasTall = false
 
+let actTimer = null // the next signature move of whoever has the stage
 let marks = [] // scenes found on the page, top to bottom: { id, chapter, top }
 let boxes = {} // scene id -> the box on the page its creature rides
 let sceneId = 'home'
@@ -125,28 +126,48 @@ const setScene = (id, duration = 1.6) => {
   if (!resting) world.setVisible(true)
   world.setFormation(formationFor(id), duration > 0 ? 2 : 0)
 
+  const tall = isTall()
   for (const [name, actor] of Object.entries(world.actors)) {
     const role = cast[name]
     if (role) {
-      const { box, ...pose } = role
+      const { box, aim = null, ...pose } = role
       const rides = Boolean(box && boxes[id])
       if (rides) world.setBox(name, boxes[id])
+      world.setAim(name, aim)
+      if (rides && tall && actor.pose.show <= 0) {
+        // phones: it comes in from the side, already at the height of its box
+        Object.assign(actor.pose, { ...pose, x: SIDE[name] * OFF_SIDE, stage: 1 })
+      }
       actor.pose.show = 1
       gsap.to(actor.pose, { ...pose, stage: rides ? 1 : 0, duration, ease: 'expo.out', overwrite: true })
     } else if (actor.pose.show > 0) {
-      gsap.to(actor.pose, {
-        ...PARK[name],
-        stage: 0,
-        duration: Math.min(duration, 1.2),
-        ease: 'power2.in',
-        overwrite: true,
-        onComplete: () => {
-          actor.pose.show = 0
-        },
-      })
+      const leave = { duration: Math.min(duration, 1.2), ease: 'power2.in', overwrite: true, onComplete: () => (actor.pose.show = 0) }
+      // phones: out sideways along its own box, never across the header or the copy
+      if (tall && actor.pose.stage > 0.5) gsap.to(actor.pose, { x: SIDE[name] * OFF_SIDE, ...leave })
+      else gsap.to(actor.pose, { ...PARK[name], stage: 0, ...leave })
     }
   }
   if (resting) gsap.delayedCall(Math.min(duration, 1.2) + 0.1, () => sceneId === 'star-map' && world?.setVisible(false))
+  scheduleActs(id, duration)
+}
+
+/**
+ * Where a creature has the stage to itself (the hero, an encounter, the last
+ * screen) it performs its signature move: once it has arrived, then now and
+ * again while you stay. Behind a chapter's copy it keeps still.
+ */
+const scheduleActs = (id, arrival) => {
+  actTimer?.kill()
+  actTimer = null
+  // the dev mask view (tools/audit_phone.mjs) starts the moves itself
+  if (new URLSearchParams(location.search).has('mask')) return
+  const name = Object.keys(sceneFor(id).cast)[0]
+  if (!name || !(id === 'home' || id === 'contact' || isEncounter(id))) return
+  const perform = () => {
+    world?.act(name)
+    actTimer = gsap.delayedCall(15, perform)
+  }
+  actTimer = gsap.delayedCall(arrival + 1.1, perform)
 }
 
 /** Where every scene starts and where the creature boxes sit, in document pixels. */
@@ -169,11 +190,13 @@ const measureStages = () => {
     const rect = el.getBoundingClientRect()
     if (rect.width < 1 || rect.height < 1) return
     const id = el.dataset.stage
-    boxes[id] = { left: rect.left, top: rect.top + y, width: rect.width, height: rect.height }
-    // the hero box is the first screen: its dragon holds that spot while the copy scrolls away
-    if (id === 'home') boxes[id].fixed = true
-    // the last box slides up under the header as the page ends: the dragon keeps below it
-    if (id === 'contact') Object.assign(boxes[id], { clipTop: navHeight() + 8, minHeight: 110 })
+    // A box scrolls with the page. Where it slides up under the header the creature keeps
+    // below that line, shrinking with what is left of the box, so it never sits under the
+    // header or over the copy that follows.
+    boxes[id] = { left: rect.left, top: rect.top + y, width: rect.width, height: rect.height, clipTop: navHeight() + 8 }
+    // phones: the chat button floats at the foot of the screen, and the copy sits right under
+    // the box, so the creature is fenced into its box (createWorld.js, setGuard)
+    if (isTall()) Object.assign(boxes[id], { clipBottom: window.innerHeight - 84, guard: true })
   })
 
   if (!world) return
@@ -299,14 +322,18 @@ const onAnchorClick = (e) => {
 
 const startWorld = () => {
   const lite = window.matchMedia('(max-width: 820px), (pointer: coarse)').matches
+  // ?mask=1 (or 2) is the dev view tools/audit_phone.mjs reads: creatures alone on black
+  const mask = Number(new URLSearchParams(location.search).get('mask')) || 0
   world = createWorld(canvasRef.value, {
     lite,
+    mask,
     modelUrl: `/models/dragon-hero${lite ? '-lite' : ''}.glb?v=${MODEL_VERSION}`,
     onProgress: (ratio) => {
       loadProgress.value = ratio
     },
     onReady: () => {
       worldReady.value = true
+      if (mask) window.__world = world
       for (const [name, actor] of Object.entries(world.actors)) Object.assign(actor.pose, PARK[name])
       measureStages()
       updateScene()
@@ -338,6 +365,8 @@ const setupMotion = async () => {
 }
 
 const teardownMotion = () => {
+  actTimer?.kill()
+  actTimer = null
   ScrollTrigger.removeEventListener('refresh', onRefresh)
   motionCtx?.revert()
   motionCtx = null

@@ -6,7 +6,13 @@
 //
 // Options: yaw, pitch (radians, strip and live), t (start second), span (strip
 // length in seconds), energy (0..1), lite=1 (phone build: no bloom), fill
-// (share of the frame the creature may take, default 0.78).
+// (share of the frame the creature may take, default 0.78), kick=1 (strip and
+// live: the creature is told it was shoved sideways and spun for 0.4 s just
+// after the start, to show how its loose parts swing and settle), act=1 (strip
+// and live: the creature is asked for its signature move just after the start),
+// room=phone (the creature is told it has only a phone band's worth of space
+// above and below it; each frame then shows that band as two red lines: use it
+// with fill=1 so the creature spans the frame the way it spans a phone).
 //
 // When a sheet or strip is drawn, window.__ready is true and window.__stats
 // holds triangle count, draw calls and the cost of one update() call.
@@ -40,7 +46,14 @@ const fail = (err) => {
 }
 
 try {
-  const renderer = new THREE.WebGLRenderer({ canvas: gl, antialias: lite, powerPreference: 'high-performance' })
+  const ref = mode === 'ref'
+  const renderer = new THREE.WebGLRenderer({
+    canvas: gl,
+    antialias: lite || ref,
+    alpha: ref,
+    preserveDrawingBuffer: ref,
+    powerPreference: 'high-performance',
+  })
   renderer.setPixelRatio(1)
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
@@ -69,15 +82,34 @@ try {
   scene.add(lights.group)
   const env = await createEnvironment(renderer, THREE)
 
-  const module = await import(/* @vite-ignore */ `/src/world/creatures/${name}.js`)
+  // ?glb=/tools/ref/creature-naga-raw.glb looks at a raw sculpt instead: pale faceted clay, no motion
+  const rawSculpt = async () => {
+    const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js')
+    const gltf = await new GLTFLoader().loadAsync(query.get('glb'))
+    const box = new THREE.Box3().setFromObject(gltf.scene)
+    const size = box.getSize(new THREE.Vector3())
+    const unit = 2 / Math.max(size.x, size.y, size.z)
+    gltf.scene.position.sub(box.getCenter(new THREE.Vector3())).multiplyScalar(unit)
+    gltf.scene.scale.setScalar(unit)
+    const clay = new THREE.MeshStandardMaterial({ color: 0xcfd6e6, roughness: 0.7, flatShading: true, envMap: env.envMap, envMapIntensity: 0.4 })
+    gltf.scene.traverse((child) => child.isMesh && (child.material = clay))
+    const group = new THREE.Group()
+    group.add(gltf.scene)
+    return { group, size: { x: size.x * unit, y: size.y * unit }, update() {}, dispose() {} }
+  }
+  const module = query.has('glb')
+    ? { createCreature: rawSculpt }
+    : await import(/* @vite-ignore */ `/src/world/creatures/${name}.js`)
   const creature = await module.createCreature(THREE, {
     envMap: env.envMap,
     lite,
     modelUrl: `/models/dragon-hero${lite ? '-lite' : ''}.glb`,
   })
   if (!creature?.group || !creature.size || typeof creature.update !== 'function') {
-    throw new Error('createCreature must return { group, size: { x, y }, update(time, dt, energy), dispose() } (optional: reach: { up, down })')
+    throw new Error('createCreature must return { group, size: { x, y }, update(time, dt, energy, motion), dispose() } (optional: reach: { up, down }, ready: Promise, act())')
   }
+  // a creature may finish loading a model after it is first shown: wait for it here
+  if (creature.ready) await creature.ready
 
   const rig = new THREE.Group()
   rig.rotation.order = 'YXZ'
@@ -100,21 +132,84 @@ try {
     const halfH = Math.tan((FOV * Math.PI) / 360) * CAMERA_Z
     const halfW = halfH * camera.aspect
     const fit = Math.min((2 * halfW * fill) / creature.size.x, (2 * halfH * fill) / creature.size.y)
+    // one creature width in pixels of this frame: the unit the room numbers are in
+    widthPx = (fit * creature.size.x * h) / (2 * halfH)
     rig.scale.setScalar(fit)
     lights.group.scale.setScalar(fit)
     lights.fitShadow(fit)
   }
 
+  let widthPx = 0
   let clock = 0
+  // what the site tells a creature about its own movement (createWorld.js): here it holds
+  // still, unless kick=1 shoves and spins it for a moment so the springs have something to answer
+  const kick = query.get('kick') === '1'
+  const kickAt = num('t', 1.2) + 0.15
+  // open space round the creature in creature widths (createWorld.js). On a phone the creature
+  // fills the width of the screen and its band is short: about 0.42 widths above its centre and
+  // 0.38 below, with the header above that and the caption below.
+  const phoneRoom = query.get('room') === 'phone'
+  const motion = {
+    vx: 0,
+    vy: 0,
+    spin: 0,
+    yaw: 0,
+    pitch: 0,
+    roomUp: phoneRoom ? 0.42 : 1.1,
+    roomDown: phoneRoom ? 0.38 : 1.1,
+    roomLeft: phoneRoom ? 0.5 : 1.4,
+    roomRight: phoneRoom ? 0.5 : 1.4,
+  }
+  let acted = query.get('act') !== '1'
+  const feel = () => {
+    const on = kick && clock > kickAt && clock < kickAt + 0.4
+    motion.vx = on ? 1.6 : 0
+    motion.vy = on ? -0.5 : 0
+    motion.spin = on ? 3.2 : 0
+    motion.yaw = rig.rotation.y
+    motion.pitch = rig.rotation.x
+    if (!acted && clock > kickAt) {
+      acted = true
+      creature.act?.()
+    }
+    return motion
+  }
   const advanceTo = (seconds, level = energy) => {
     while (clock < seconds - 1e-6) {
       clock += STEP
-      creature.update(clock, STEP, level)
+      creature.update(clock, STEP, level, feel())
     }
   }
   const draw = () => (composer ? composer.render(STEP) : renderer.render(scene, camera))
 
-  if (mode === 'live') {
+  if (ref) {
+    // One clean picture for the 3D generator (tools/generate_creature_hunyuan.py):
+    // the creature alone as pale faceted clay on a transparent ground, the way
+    // the dragon's own concept picture looked. Glows and loose particles are
+    // left out, they would be sculpted as floating lumps.
+    const side = num('size', 1536)
+    composer = null
+    scene.background = null
+    renderer.setClearColor(0x000000, 0)
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x7c8494, 1.15))
+    const clay = new THREE.MeshStandardMaterial({ color: 0xe4e8f0, roughness: 0.82, flatShading: true, side: THREE.DoubleSide })
+    const eye = new THREE.MeshBasicMaterial({ color: 0x35c8ff })
+    advanceTo(num('t', 1.2))
+    rig.traverse((child) => {
+      if (child.isPoints || child.isSprite || child.isLine) child.visible = false
+      if (!child.isMesh) return
+      const glows = (Array.isArray(child.material) ? child.material : [child.material]).some((m) => m.isMeshBasicMaterial)
+      if (glows && child.isInstancedMesh) child.visible = false
+      else child.material = glows ? eye : clay
+    })
+    resize(side, side)
+    rig.rotation.set(num('pitch', 0), num('yaw', 0), 0)
+    renderer.render(scene, camera)
+    document.body.classList.add('live')
+    window.__png = gl.toDataURL('image/png')
+    window.__stats = { name, size: creature.size }
+    window.__ready = true
+  } else if (mode === 'live') {
     document.body.classList.add('live')
     const fitWindow = () => resize(window.innerWidth, window.innerHeight)
     fitWindow()
@@ -125,7 +220,7 @@ try {
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
       clock += dt
-      creature.update(clock, dt, energy)
+      creature.update(clock, dt, energy, feel())
       draw()
       requestAnimationFrame(frame)
     }
@@ -172,6 +267,16 @@ try {
       ctx.fillText(cell.label, x + 14, y + 26)
       ctx.strokeStyle = 'rgba(232,236,244,0.12)'
       ctx.strokeRect(x + 0.5, y + 0.5, cellW - 1, cellH - 1)
+      if (phoneRoom) {
+        // the phone band: the header sits above the top line, the caption below the bottom one
+        ctx.strokeStyle = 'rgba(255,90,90,0.75)'
+        for (const edge of [cellH / 2 - motion.roomUp * widthPx, cellH / 2 + motion.roomDown * widthPx]) {
+          ctx.beginPath()
+          ctx.moveTo(x, y + edge)
+          ctx.lineTo(x + cellW, y + edge)
+          ctx.stroke()
+        }
+      }
     })
 
     renderer.render(scene, camera)
@@ -180,7 +285,7 @@ try {
     const t0 = performance.now()
     for (let i = 0; i < 240; i += 1) {
       clock += STEP
-      creature.update(clock, STEP, energy)
+      creature.update(clock, STEP, energy, feel())
     }
     const updateMs = (performance.now() - t0) / 240
     window.__stats = {

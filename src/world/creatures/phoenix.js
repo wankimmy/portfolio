@@ -1,26 +1,32 @@
 /**
  * The phoenix: a firebird reborn, the sign for old systems rebuilt.
  *
- * Built in code, no imports. The body, head, legs and chest feathers are
- * static meshes. The wings (arms plus layered cambered feathers), the crest
- * and the tail plumes are dynamic: their vertices are rewritten each frame
- * through preallocated typed arrays and their normals are recomputed. The
- * head is a child pivot that nods with the beat. Surface detail comes from
- * two generated normal maps: overlapping scales on the body and barbs across
- * each feather vane.
+ * Code-built and flat-shaded like the dragon: body, head, legs and chest feathers are
+ * static meshes; the wings (arms plus layered cambered feathers), the crest and the tail
+ * plumes are dynamic, rewritten each frame through preallocated typed arrays. The loose
+ * parts (plumes, primaries, crest) run on damped springs fed by the creature's motion.
+ *
+ * Signature move, REBIRTH (about 5.2 s, from act()): gather (wings fold round the body,
+ * the plumes draw in, real flame licks up from the chest and wing edges), burn (the flames
+ * close over it into one fireball), flash (the bird goes into the light and is gone), ash
+ * (sparks burst out, hang and swirl), spiral back to one point, a second softer flash, the
+ * bird unfolds from that point in its proudest pose with flame streaming off wing and tail,
+ * a ring of light rolls off, and it settles back into the beat. All flame comes from
+ * ../flame.js. Everything in the move stays between the room lines the site passes in.
  */
+import { createFlame } from '../flame.js'
 
 const TAU = Math.PI * 2
 const HALF_PI = Math.PI / 2
 
-// Colours. Values above 1 are HDR: they bloom on desktop and still read on phones.
-const EMBER = [0.34, 0.05, 0.02]
-const DEEP = [0.2, 0.035, 0.015]
-const AMBER = [0.6, 0.15, 0.025]
-const GOLD = [0.95, 0.4, 0.08]
-const MOLTEN = [0.78, 0.22, 0.04]
-const PALE = [1.0, 0.6, 0.26]
-const HOT = [1.9, 1.12, 0.42]
+// Colours (linear, HDR above 1 blooms on desktop). Pearl and gold, molten amber, ember red
+// only at the feather roots and deep in the tail, white-hot only at the very tips.
+const EMBER = [0.5, 0.1, 0.03]
+const DEEP = [0.3, 0.05, 0.02]
+const AMBER = [0.9, 0.4, 0.1]
+const GOLD = [0.98, 0.72, 0.36]
+const PEARL = [0.95, 0.88, 0.76]
+const HOT = [1.9, 1.2, 0.5]
 const EYE_DARK = [0.16, 0.03, 0.012]
 
 const SHOULDER = [0.12, 0.3, 0]
@@ -30,11 +36,12 @@ const HEAD_PIVOT = [0.035, 0.56, 0.09]
 const CREST_ROOT = [-0.03, 0.12, -0.02] // relative to the head pivot
 const PLUME_ROOT = [0, -0.5, -0.04]
 const PLUME_LEN = [0.95, 1.12, 1.25, 1.35, 1.25, 1.1, 0.95]
-const EMBER_COUNT = 40
 const ARM_RAD = [0.04, 0.034, 0.028, 0.022, 0.015]
+const FOLD1 = 2.5 // wing angles when folded round the body (right wing)
+const FOLD2 = -1.0
+const MOVE_LEN = 5.2
 
 // torso rings, bottom to neck: y, x, z, rx, rz, tone (0 = back and hips, 1 = breast)
-// the neck (y above 0.15) bends in x: base, back, forward, into the head: an S-curve
 const TORSO = [
   [-0.54, 0, -0.02, 0.05, 0.05, 0.0],
   [-0.46, 0, -0.01, 0.1, 0.095, 0.0],
@@ -80,19 +87,33 @@ function beat(u) {
 function smooth01(x) {
   return smooth(clamp01(x))
 }
+// eased 0..1 between a and b (clamped)
+function rampT(t, a, b) {
+  return smooth01((t - a) / (b - a))
+}
+// a bump that rises and falls over dur from t0 (0 outside)
+function flash01(t, t0, dur) {
+  const x = (t - t0) / dur
+  return x <= 0 || x >= 1 ? 0 : Math.sin(Math.PI * x)
+}
 
 // feather colour along its length (u: root 0 to tip 1) and across the vane (t: -1 to 1).
-// Deep ember roots, amber and gold through the body of the feather, white-hot only at the tips.
+// Ember roots, amber and gold through the body of the feather, pearl, white-hot at the very tip.
 function featherColor(u, t) {
   const c =
-    u < 0.35
-      ? mix(DEEP, EMBER, u / 0.35)
-      : u < 0.62
-        ? mix(EMBER, AMBER, (u - 0.35) / 0.27)
-        : u < 0.88
-          ? mix(AMBER, GOLD, (u - 0.62) / 0.26)
-          : mix(GOLD, HOT, (u - 0.88) / 0.12)
-  return shade(c, (1 - 0.16 * Math.abs(t)) * (u < 0.88 ? 0.9 : 1))
+    u < 0.3
+      ? mix(EMBER, AMBER, u / 0.3)
+      : u < 0.75
+        ? mix(AMBER, GOLD, (u - 0.3) / 0.45)
+        : u < 0.97
+          ? mix(GOLD, PEARL, (u - 0.75) / 0.22)
+          : mix(PEARL, HOT, (u - 0.97) / 0.03)
+  return shade(c, 1 - 0.14 * Math.abs(t))
+}
+// tail plumes: deep ember through the body, amber and white-hot at the eye
+function tailColor(u, t) {
+  const c = u < 0.85 ? mix(DEEP, AMBER, u / 0.85) : mix(AMBER, HOT, (u - 0.85) / 0.15)
+  return shade(c, 1 - 0.14 * Math.abs(t))
 }
 
 // ---- generated textures ----------------------------------------------------
@@ -121,8 +142,7 @@ function scaleHeight(x, y) {
   return Math.pow(best, 0.4)
 }
 
-// barbs: the ridges run ACROSS the vane (they vary with y, the vane's width), with
-// fine striations along the length. u (x) runs along the feather, v (y) across it.
+// barbs: ridges across the vane with fine striations along the length
 function barbHeight(x, y) {
   const ridges = Math.sin(TAU * (y * 22 + 0.04 * Math.sin(TAU * x)))
   const fine = Math.sin(TAU * (y * 66 + x * 3))
@@ -160,6 +180,55 @@ function makeNormalTex(THREE, size, height, strength) {
   return tex
 }
 
+// soft radial glow (white, alpha falls off): the fireball and the flash are this, scaled and tinted
+function makeGlowTex(THREE) {
+  const N = 64
+  const data = new Uint8Array(N * N * 4)
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const dx = ((x + 0.5) / N) * 2 - 1
+      const dy = ((y + 0.5) / N) * 2 - 1
+      const r2 = dx * dx + dy * dy
+      const a = r2 < 1 ? Math.exp(-r2 * 4.5) : 0
+      const k = 4 * (y * N + x)
+      data[k] = 255
+      data[k + 1] = 255
+      data[k + 2] = 255
+      data[k + 3] = Math.round(a * 255)
+    }
+  }
+  const tex = new THREE.DataTexture(data, N, N)
+  tex.magFilter = THREE.LinearFilter
+  tex.minFilter = THREE.LinearFilter
+  tex.needsUpdate = true
+  return tex
+}
+
+// a soft ring of light: a Gaussian across the ring's width, fading to nothing at its edge
+function makeRingTex(THREE) {
+  const N = 64
+  const data = new Uint8Array(N * N * 4)
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const dx = ((x + 0.5) / N) * 2 - 1
+      const dy = ((y + 0.5) / N) * 2 - 1
+      const r = Math.sqrt(dx * dx + dy * dy)
+      const q = (r - 0.87) / 0.06
+      const a = r < 1 ? Math.exp(-q * q) : 0
+      const k = 4 * (y * N + x)
+      data[k] = 255
+      data[k + 1] = 255
+      data[k + 2] = 255
+      data[k + 3] = Math.round(a * 255)
+    }
+  }
+  const tex = new THREE.DataTexture(data, N, N)
+  tex.magFilter = THREE.LinearFilter
+  tex.minFilter = THREE.LinearFilter
+  tex.needsUpdate = true
+  return tex
+}
+
 // ---- mesh building helpers (build time) -----------------------------------
 
 function newBuf() {
@@ -186,13 +255,14 @@ function grid(b, v0, rows, stride, cols, flip) {
   }
 }
 // a feather vane: rows+1 by nc vertices across the vane (nc odd keeps a shaft column)
-function allocFeather(b, rows, nc, flip) {
+function allocFeather(b, rows, nc, flip, colorFn) {
+  const cf = colorFn || featherColor
   const v0 = b.pos.length / 3
   for (let r = 0; r <= rows; r++) {
     for (let c = 0; c < nc; c++) {
       const u = r / rows
       const t = nc === 1 ? 0 : (2 * c) / (nc - 1) - 1
-      vert(b, 0, 0, 0, featherColor(u, t), u, c / Math.max(1, nc - 1))
+      vert(b, 0, 0, 0, cf(u, t), u, c / Math.max(1, nc - 1))
     }
   }
   grid(b, v0, rows, nc, nc - 1, flip)
@@ -316,7 +386,6 @@ function writeRibbon(arr, v0, PN, nc, cx, cy, cz) {
     const lx = -ty / tl
     const ly = tx / tl
     const t = r / PN
-    // the vane stays a narrow shaft, then opens into the eye: a cambered, double-sided ribbon
     const w = 0.014 + 0.085 * Math.pow(smooth01((t - 0.3) / 0.6), 1.3)
     for (let c = 0; c < nc; c++) {
       const s = nc === 1 ? 0 : (2 * c) / (nc - 1) - 1
@@ -324,7 +393,6 @@ function writeRibbon(arr, v0, PN, nc, cx, cy, cz) {
       const k = 3 * (v0 + r * nc + c)
       arr[k] = cx[r] + lx * off
       arr[k + 1] = cy[r] + ly * off
-      // camber: the vane bows out toward the viewer, the shaft sits on the crest
       arr[k + 2] = cz[r] + 0.03 * (1 - s * s) * smooth01((t - 0.1) / 0.5)
     }
   }
@@ -338,7 +406,6 @@ function writeDisc(arr, v0, cx, cy, cz, rx, ry) {
     const th = (TAU * j) / 12
     const c = Math.cos(th)
     const s = Math.sin(th)
-    // hot pupil at 0.42 of the radius, a dark ring out to the molten edge
     const k1 = 3 * (v0 + 1 + j)
     arr[k1] = cx + 0.42 * rx * c
     arr[k1 + 1] = cy + 0.42 * ry * s
@@ -361,15 +428,14 @@ function flat(list) {
 
 // ---- static builders ------------------------------------------------------
 
-function buildBody(b, nc) {
-  const S = 20
+function buildBody(b, nc, S) {
   const n = TORSO.length
   const v0 = b.pos.length / 3
   for (let i = 0; i < n; i++) {
     const R = TORSO[i]
     const tone = R[5]
     const back = mix(DEEP, EMBER, tone)
-    const front = shade(mix(AMBER, MOLTEN, tone), 0.8)
+    const front = shade(mix(AMBER, GOLD, tone), 0.95)
     for (let j = 0; j <= S; j++) {
       const th = (TAU * j) / S
       const f = 0.5 + 0.5 * Math.sin(th)
@@ -386,27 +452,27 @@ function buildBody(b, nc) {
   // legs: thigh, shin, ankle, with three toes each and a hooked talon, tucked under the body
   for (const s of [-1, 1]) {
     const leg = [s * 0.12, -0.42, 0.02, s * 0.14, -0.5, 0.04, s * 0.18, -0.66, 0.1, s * 0.15, -0.8, 0.16]
-    const lb = allocTube(b, 4, 8, (i) => [EMBER, AMBER, AMBER, GOLD][i], s > 0)
-    writeTube(b.pos, lb, leg, 4, [0.07, 0.05, 0.04, 0.026], 8, 1)
+    const lb = allocTube(b, 4, 10, (i) => [DEEP, AMBER, AMBER, GOLD][i], s > 0)
+    writeTube(b.pos, lb, leg, 4, [0.07, 0.05, 0.04, 0.026], 10, 1)
     const toes = [
       [0.02, 0.1],
       [0.05, 0.08],
       [-0.03, 0.07],
     ]
     for (const t of toes) {
-      const tb = allocTube(b, 2, 6, () => GOLD, s > 0)
-      const pts = [s * 0.15, -0.8, 0.16, s * (0.15 + t[0]), -0.83, 0.16 + t[1]]
-      writeTube(b.pos, tb, pts, 2, [0.02, 0.012], 6, 1)
+      const tb = allocTube(b, 3, 8, () => GOLD, s > 0)
+      const pts = [s * 0.15, -0.8, 0.16, s * (0.15 + t[0] * 0.5), -0.82, 0.16 + t[1] * 0.5, s * (0.15 + t[0]), -0.83, 0.16 + t[1]]
+      writeTube(b.pos, tb, pts, 3, [0.02, 0.014, 0.01], 8, 1)
       const tipX = s * (0.15 + t[0])
       const tipZ = 0.16 + t[1]
-      const talb = allocTube(b, 3, 6, () => DEEP, s > 0)
+      const talb = allocTube(b, 3, 8, () => DEEP, s > 0)
       writeTube(
         b.pos,
         talb,
         [tipX, -0.83, tipZ, tipX, -0.85, tipZ + 0.012, tipX, -0.845, tipZ + 0.03],
         3,
         [0.014, 0.009, 0.004],
-        6,
+        8,
         1,
       )
     }
@@ -426,7 +492,7 @@ function buildBody(b, nc) {
       writeFeather(b.pos, fb, 4, nc, 1, o * 0.05, row.y, row.z, -HALF_PI + o * 0.22, row.len, 0.07, 0.1, 0.035)
     }
   }
-  // leg feathers: small plumes tucked down the shins, a little offset per row, so the legs read as feathered
+  // leg feathers: small plumes tucked down the shins
   for (const s of [-1, 1]) {
     for (let i = 0; i < 6; i++) {
       const fb = allocFeather(b, 3, nc, false)
@@ -441,29 +507,27 @@ function buildBody(b, nc) {
   }
 }
 
-function buildHead(b) {
-  // skull (about a quarter larger), heavy brow, jaw
-  ellipsoid(b, rel(0, 0.67, 0.16), [0.19, 0.18, 0.22], 10, 16, (sx, sy, sz) =>
-    mix(mix(EMBER, AMBER, 0.5 + 0.5 * sz), GOLD, clamp01(0.25 + 0.5 * sy + 0.25 * sz)),
+function buildHead(b, HS, HL) {
+  // skull, heavy brow, jaw
+  ellipsoid(b, rel(0, 0.67, 0.16), [0.19, 0.18, 0.22], HL, HS, (sx, sy, sz) =>
+    mix(mix(GOLD, PEARL, 0.5 + 0.5 * sz), GOLD, clamp01(0.2 + 0.4 * sy + 0.2 * sz)),
   )
-  ellipsoid(b, rel(0, 0.725, 0.26), [0.17, 0.034, 0.07], 4, 12, () => DEEP)
-  ellipsoid(b, rel(0, 0.6, 0.2), [0.12, 0.07, 0.16], 6, 12, (sx, sy) => mix(EMBER, AMBER, 0.5 + 0.5 * sy))
+  ellipsoid(b, rel(0, 0.725, 0.26), [0.17, 0.034, 0.07], Math.max(4, HL >> 1), HS, () => DEEP)
+  ellipsoid(b, rel(0, 0.6, 0.2), [0.12, 0.07, 0.16], Math.max(4, HL >> 1), HS, (sx, sy) => mix(EMBER, AMBER, 0.5 + 0.5 * sy))
 
   // hooked beak: upper mandible curls down at the tip, lower mandible tucks under
   const upper = flat([rel(0, 0.69, 0.28), rel(0, 0.67, 0.38), rel(0, 0.63, 0.46), rel(0, 0.57, 0.48)])
-  const ub = allocTube(b, 4, 8, (i) => [GOLD, AMBER, EMBER, DEEP][i], true)
-  writeTube(b.pos, ub, upper, 4, [0.062, 0.052, 0.036, 0.015], 8, 1)
+  const ub = allocTube(b, 4, 10, (i) => [GOLD, AMBER, EMBER, DEEP][i], true)
+  writeTube(b.pos, ub, upper, 4, [0.062, 0.052, 0.036, 0.015], 10, 1)
   const lower = flat([rel(0, 0.64, 0.28), rel(0, 0.62, 0.36), rel(0, 0.6, 0.41)])
-  const lb = allocTube(b, 3, 8, (i) => [AMBER, DEEP, EMBER][i], true)
-  writeTube(b.pos, lb, lower, 3, [0.045, 0.032, 0.015], 8, 1)
+  const lb = allocTube(b, 3, 10, (i) => [AMBER, DEEP, EMBER][i], true)
+  writeTube(b.pos, lb, lower, 3, [0.045, 0.032, 0.015], 10, 1)
 }
 
-function buildEyes(b) {
-  // small, fierce eyes: a dark ember iris with one hot point of light in the front cap
+function buildEyes(b, S) {
+  // small, fierce eyes: a dark iris with one hot point of light in the front cap
   for (const s of [-1, 1]) {
-    ellipsoid(b, rel(s * 0.085, 0.68, 0.315), [0.03, 0.026, 0.026], 6, 12, (sx, sy, sz) =>
-      sz > 0.75 ? HOT : EYE_DARK,
-    )
+    ellipsoid(b, rel(s * 0.085, 0.68, 0.315), [0.042, 0.036, 0.036], 6, S, (sx, sy, sz) => (sz > 0.75 ? HOT : EYE_DARK))
   }
 }
 
@@ -474,31 +538,43 @@ function buildEyes(b) {
  * @param {{ envMap: import('three').Texture, lite: boolean }} options
  */
 export function createCreature(THREE, { envMap, lite }) {
-  const NC = lite ? 3 : 5 // feather columns across the vane
-  const RP = lite ? 4 : 6 // primary rows
+  const NC = lite ? 7 : 13 // feather columns across the vane
+  const RP = lite ? 13 : 16 // primary rows
   const RS = lite ? 3 : 4 // secondary rows
   const RV = lite ? 2 : 3 // covert rows
   const RCR = lite ? 3 : 4 // crest rows
-  const PN = lite ? 8 : 14
+  const PN = lite ? 8 : 16 // tail plume rows
   const NPRIM = lite ? 9 : 12
   const NSEC = lite ? 10 : 14
   const NCOVA = lite ? 10 : 16
   const NCOVB = lite ? 8 : 14
-  const NMARG = lite ? 4 : 10 // marginal coverts, the row over the primaries' roots
-  const NTC = lite ? 3 : 5 // tail plume columns across the vane
+  const NMARG = lite ? 4 : 10
+  const NTC = lite ? 3 : 7 // tail plume columns across the vane
+  const BODY_S = lite ? 16 : 32 // body ring sides
+  const HEAD_S = lite ? 12 : 24
+  const HEAD_L = lite ? 8 : 16
+  const EYE_S = lite ? 8 : 12
+  const EMBER_N = lite ? 48 : 110
+  const FLAME_N = lite ? 110 : 260
+  const PROUD1 = lite ? 0.25 : 0.7 // proudest pose (the rebirth): wings thrown wide, level on phones
+  const PROUD2 = lite ? 0.1 : 0.35
+  const FLAT1 = 0.4 // resting wings on a phone band: open level
+  const FLAT2 = 0.12
 
   // ---- textures
   const texSize = lite ? 256 : 512
   const bodyTex = makeNormalTex(THREE, texSize, scaleHeight, 2.6)
   const barbTex = makeNormalTex(THREE, texSize, barbHeight, 2.2)
+  const glowTex = makeGlowTex(THREE)
+  const ringTex = makeRingTex(THREE)
 
   // ---- static body, head and eyes
   const SB = newBuf()
-  buildBody(SB, NC)
+  buildBody(SB, NC, BODY_S)
   const HB = newBuf()
-  buildHead(HB)
+  buildHead(HB, HEAD_S, HEAD_L)
   const EB = newBuf()
-  buildEyes(EB)
+  buildEyes(EB, EYE_S)
 
   // ---- dynamic crest (child of the head pivot)
   const CB = newBuf()
@@ -510,7 +586,7 @@ export function createCreature(THREE, { envMap, lite }) {
   const WING = []
   for (let side = 0; side < 2; side++) {
     const rec = { mx: side === 0 ? 1 : -1, arm: 0, prim: [], sec: [], cova: [], covb: [], marg: [] }
-    rec.arm = allocTube(WB, 5, 6, (i) => [EMBER, AMBER, AMBER, GOLD, GOLD][i], side === 0)
+    rec.arm = allocTube(WB, 5, 8, (i) => [DEEP, AMBER, AMBER, GOLD, GOLD][i], side === 0)
     const flip = side === 1
     for (let i = 0; i < NPRIM; i++) rec.prim.push(allocFeather(WB, RP, NC, flip))
     for (let j = 0; j < NSEC; j++) rec.sec.push(allocFeather(WB, RS, NC, flip))
@@ -523,7 +599,7 @@ export function createCreature(THREE, { envMap, lite }) {
   // ---- dynamic tail plumes and their eyes
   const TB = newBuf()
   const TAIL = []
-  for (let i = 0; i < 7; i++) TAIL.push(allocFeather(TB, PN, NTC, false))
+  for (let i = 0; i < 7; i++) TAIL.push(allocFeather(TB, PN, NTC, false, tailColor))
   const TE = newBuf()
   const EYE = []
   for (let i = 0; i < 7; i++) EYE.push(allocDisc(TE))
@@ -532,25 +608,28 @@ export function createCreature(THREE, { envMap, lite }) {
     PC.push({ x: new Float64Array(PN + 1), y: new Float64Array(PN + 1), z: new Float64Array(PN + 1) })
   }
 
-  // ---- materials
-  const common = { vertexColors: true, envMap, envMapIntensity: 0.5, side: THREE.DoubleSide }
+  // ---- materials: the dragon's recipe (flat shading, normal relief, clearcoat, iridescence on desktop)
+  const common = { vertexColors: true, envMap, envMapIntensity: 0.6, side: THREE.DoubleSide, flatShading: true }
   const skin = (map, s, rim) => {
     const m = lite
       ? new THREE.MeshStandardMaterial({
           ...common,
-          roughness: 0.5,
-          metalness: 0.15,
+          roughness: 0.6,
+          metalness: 0.12,
           normalMap: map,
           normalScale: new THREE.Vector2(s, s),
         })
       : new THREE.MeshPhysicalMaterial({
           ...common,
-          roughness: 0.42,
-          metalness: 0.15,
+          roughness: 0.5,
+          metalness: 0.12,
           normalMap: map,
           normalScale: new THREE.Vector2(s, s),
-          clearcoat: 0.2,
-          clearcoatRoughness: 0.3,
+          clearcoat: 0.38,
+          clearcoatRoughness: 0.35,
+          iridescence: 0.42,
+          iridescenceIOR: 1.3,
+          iridescenceThicknessRange: [140, 420],
         })
     // soft fire rim on the silhouette
     m.onBeforeCompile = (shader) => {
@@ -558,15 +637,39 @@ export function createCreature(THREE, { envMap, lite }) {
         '#include <emissivemap_fragment>',
         `#include <emissivemap_fragment>
         float rimF = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 3.0);
-        totalEmissiveRadiance += vec3(${rim}) * rimF * 0.22;`,
+        totalEmissiveRadiance += vec3(${rim}) * rimF * 0.18;`,
       )
     }
     return m
   }
-  const bodyMat = skin(bodyTex, 1.4, '1.0, 0.36, 0.08')
+  const bodyMat = skin(bodyTex, 1.2, '1.0, 0.36, 0.08')
   const featherMat = skin(barbTex, 0.9, '1.0, 0.34, 0.06')
   const glowMat = new THREE.MeshBasicMaterial({ vertexColors: true })
-  const embMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.5, 0.5, 0.12) })
+  // sparks are soft additive points of light (HDR, so they bloom on desktop and read as points on phones)
+  const embMat = new THREE.MeshBasicMaterial({
+    map: glowTex,
+    color: new THREE.Color(2.4, 1.1, 0.32),
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  })
+  const spriteMat = new THREE.MeshBasicMaterial({
+    map: glowTex,
+    color: new THREE.Color(1, 1, 1),
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  })
+  const ringMat = new THREE.MeshBasicMaterial({
+    map: ringTex,
+    color: new THREE.Color(1, 1, 1),
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  })
 
   // ---- geometry objects
   const geo = (b, dynamic) => {
@@ -577,7 +680,7 @@ export function createCreature(THREE, { envMap, lite }) {
     g.setAttribute('color', new THREE.BufferAttribute(Float32Array.from(b.col), 3))
     g.setAttribute('uv', new THREE.BufferAttribute(Float32Array.from(b.uv), 2))
     g.setIndex(b.idx)
-    if (!dynamic) g.computeVertexNormals()
+    g.computeVertexNormals()
     return g
   }
   const bodyGeo = geo(SB, false)
@@ -611,40 +714,50 @@ export function createCreature(THREE, { envMap, lite }) {
     m.frustumCulled = false
   }
 
-  // embers: one instanced draw, recycled from a pool. Small soft spheres, dimmer than the tips.
-  const embGeo = new THREE.SphereGeometry(1, 6, 4)
-  const embers = new THREE.InstancedMesh(embGeo, embMat, EMBER_COUNT)
+  // the move's glow and light: a soft sprite for the fireball and the flashes, a ring for the roll-off
+  const planeGeo = new THREE.PlaneGeometry(1, 1)
+  const glowSprite = new THREE.Mesh(planeGeo, spriteMat)
+  glowSprite.frustumCulled = false
+  glowSprite.renderOrder = 2
+  const ring = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), ringMat)
+  ring.frustumCulled = false
+  ring.renderOrder = 2
+
+  // sparks: one instanced draw, recycled from a pool. Small soft spheres, dimmer than the tips.
+  const embGeo = new THREE.PlaneGeometry(1, 1)
+  const embers = new THREE.InstancedMesh(embGeo, embMat, EMBER_N)
   embers.frustumCulled = false
   embers.castShadow = false
   embers.receiveShadow = false
   embers.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
   const dummy = new THREE.Object3D()
-  const EX = new Float64Array(EMBER_COUNT)
-  const EY = new Float64Array(EMBER_COUNT)
-  const EZ = new Float64Array(EMBER_COUNT)
-  const EVX = new Float64Array(EMBER_COUNT)
-  const EVY = new Float64Array(EMBER_COUNT)
-  const EAGE = new Float64Array(EMBER_COUNT)
-  const ELIFE = new Float64Array(EMBER_COUNT)
-  const ESIZE = new Float64Array(EMBER_COUNT)
-  for (let i = 0; i < EMBER_COUNT; i++) {
+  const EX = new Float64Array(EMBER_N)
+  const EY = new Float64Array(EMBER_N)
+  const EZ = new Float64Array(EMBER_N)
+  const EVX = new Float64Array(EMBER_N)
+  const EVY = new Float64Array(EMBER_N)
+  const EAGE = new Float64Array(EMBER_N)
+  const ELIFE = new Float64Array(EMBER_N)
+  const ESIZE = new Float64Array(EMBER_N)
+  const EDRAG = new Float64Array(EMBER_N)
+  const ESPIN = new Float64Array(EMBER_N)
+  for (let i = 0; i < EMBER_N; i++) {
+    EAGE[i] = 1
+    ELIFE[i] = 0
     dummy.position.set(0, 0, 0)
     dummy.scale.setScalar(0)
     dummy.updateMatrix()
     embers.setMatrixAt(i, dummy.matrix)
   }
-  let emitAcc = 0
-  let emitSeq = 0
-  let poolPtr = 0
-  // the outer primary tips of each wing (vertex indices), where embers leave: last row, middle column
-  const MID = (NC - 1) >> 1
-  const TIP = [WING[0].prim[2] + RP * NC + MID, WING[1].prim[2] + RP * NC + MID]
+
+  // real flame, from flame.js: the same emit API as the dragon's breath
+  const flame = createFlame(THREE, { count: FLAME_N, lite, drag: 1.6, turbulence: 1, buoyancy: 1 })
 
   // ---- scene graph
   const inner = new THREE.Group()
-  inner.add(bodyMesh, headPivot, wingMesh, tailMesh, tailEyeMesh, embers)
+  inner.add(bodyMesh, headPivot, wingMesh, tailMesh, tailEyeMesh)
   const group = new THREE.Group()
-  group.add(inner)
+  group.add(inner, glowSprite, ring, embers, flame.mesh)
 
   // ---- per-frame state (no allocation in update)
   let ex = 0
@@ -655,14 +768,167 @@ export function createCreature(THREE, { envMap, lite }) {
   let a2 = 0
   let bb = 0
   const ARM_PTS = new Float64Array(15)
+  let disposed = false
 
-  // one wing chain at a given lag: sets elbow (ex, ey), wrist (wx, wy), angles a1, a2, and beat bb
+  // move envelopes, set each frame from the move clock (defaults = idle)
+  let moveT = -1
+  let mFold = 0 // wings folded round the body (0 .. 1)
+  let mSpread = 0 // wings thrown wide (0 .. 1)
+  let mBand = 0 // how little vertical room there is (0 = plenty, 1 = a phone band): wings level, plumes short
+  let mGlow = 0 // body and feather emissive (0 .. 1)
+  let mScale = 1 // whole body scale (the body goes into the light and back)
+  let mTail = 1 // plume length
+  let mGather = 0
+  let mSpiral = 0
+  let mStream = 0
+  let mBurnA = 0 // fireball presence
+  let curTop = 9 // room lines in group units (set per frame)
+  let curBot = -9
+  let fireR = 1
+  let fireSX = 1
+  let fireSY = 1
+  let flameAcc = 0
+  let emitAcc = 0
+  let emitSeq = 0
+  let fseq = 0
+  let poolPtr = 0
+  let burst1 = false
+  let burst2 = false
+  let sparkBurst = false
+  let spiralDone = false
+  let ringOn = false
+  let kS = 1 // body scale this frame
+  let innerY = 0 // bob this frame
+  let gcx = 0 // group x of the body centre
+
+  // the body points in group space this frame (no allocation: read gX, gY, gZ after toG)
+  let gX = 0
+  let gY = 0
+  let gZ = 0
+  function toG(x, y, z) {
+    gX = -cxC * kS + kS * x
+    gY = -cyC * kS + innerY + kS * y
+    gZ = kS * z
+  }
+
+  // the body's emissive: raised for the move, restored to black exactly when idle
+  const glowCol = [0, 0, 0]
+  let glowOn = false
+  function setGlow(v) {
+    if (v <= 0) {
+      if (glowOn) {
+        bodyMat.emissive.setRGB(0, 0, 0)
+        featherMat.emissive.setRGB(0, 0, 0)
+        glowOn = false
+      }
+      return
+    }
+    glowOn = true
+    glowCol[0] = 0.9 * v
+    glowCol[1] = 0.36 * v
+    glowCol[2] = 0.1 * v
+    bodyMat.emissive.setRGB(glowCol[0], glowCol[1], glowCol[2])
+    featherMat.emissive.setRGB(glowCol[0], glowCol[1], glowCol[2])
+  }
+
+  // ---- springs: loose parts lag behind the body, overshoot a little and settle.
+  const SPRING_K = 46 // stiffness
+  const SPRING_C = 30 // pull toward the part before
+  const SPRING_D = 3.2 // damping per second
+  const SUBSTEPS = 4
+  const VMAX = 3 // displacement speed limit
+  const PLUME_LIM = 0.45 // rig units
+  const WING_LIM = 0.3 // radians
+  const CREST_LIM = 0.35 // radians
+  const NCREST = 7
+  const PL_X = new Float64Array(21) // seven plumes, three springs each
+  const PL_V = new Float64Array(21)
+  const PL_D = new Float64Array(21)
+  const WG_X = new Float64Array(NPRIM)
+  const WG_V = new Float64Array(NPRIM)
+  const WG_D = new Float64Array(NPRIM)
+  const CR_X = new Float64Array(NCREST)
+  const CR_V = new Float64Array(NCREST)
+  const CR_D = new Float64Array(NCREST)
+  let pvx = 0
+  let pvy = 0
+  let psp = 0
+
+  function springChain(x, v, d, start, n, h, lim) {
+    for (let j = start; j < start + n; j += 1) {
+      const left = j > start ? x[j - 1] : 0
+      let vel = v[j] + (SPRING_K * (d[j] - x[j]) + SPRING_C * (left - x[j]) - SPRING_D * v[j]) * h
+      vel = vel > VMAX ? VMAX : vel < -VMAX ? -VMAX : vel
+      v[j] = vel
+      const p = x[j] + vel * h
+      x[j] = p > lim ? lim : p < -lim ? -lim : p
+    }
+  }
+
+  // sideways lag of a plume at t (0 root .. 1 tip), from its three springs (at t = 1/3, 2/3, 1)
+  function plumeDisp(s, t) {
+    if (t <= 1 / 3) return PL_X[s] * 3 * t
+    if (t <= 2 / 3) return PL_X[s] + (PL_X[s + 1] - PL_X[s]) * (3 * t - 1)
+    return PL_X[s + 1] + (PL_X[s + 2] - PL_X[s + 1]) * (3 * t - 2)
+  }
+
+  function physics(time, dt, motion) {
+    const vx = motion && motion.vx ? motion.vx : 0
+    const vy = motion && motion.vy ? motion.vy : 0
+    const sp = motion && motion.spin ? motion.spin : 0
+    // impulses from changes in motion (per frame), then steady drives
+    const dvx = vx - pvx
+    const dvy = vy - pvy
+    const dsp = sp - psp
+    pvx = vx
+    pvy = vy
+    psp = sp
+    if (!(dt > 0)) return
+    for (let i = 0; i < 21; i += 1) PL_V[i] -= 0.4 * dvx + 0.06 * dsp
+    for (let i = 0; i < NPRIM; i += 1) WG_V[i] += -0.8 * dvy + 0.2 * dvx - 0.05 * dsp * ((i + 1) / NPRIM)
+    for (let i = 0; i < NCREST; i += 1) CR_V[i] -= 0.15 * dvx
+
+    const tail = Math.max(-0.4, Math.min(0.4, -0.1 * sp - 0.06 * vx))
+    for (let i = 0; i < 7; i += 1) {
+      for (let j = 0; j < 3; j += 1) {
+        PL_D[3 * i + j] = tail * ((j + 1) / 3) + 0.025 * Math.sin(time * 1.3 + i * 0.6 + j * 0.9)
+      }
+    }
+    const lift = Math.max(-0.25, Math.min(0.25, -0.05 * vy))
+    for (let i = 0; i < NPRIM; i += 1) {
+      WG_D[i] = lift - 0.04 * sp * ((i + 1) / NPRIM) + 0.02 * Math.sin(time * 1.1 - i * 0.5)
+    }
+    for (let i = 0; i < NCREST; i += 1) {
+      CR_D[i] = -0.05 * sp + 0.035 * Math.sin(time * 1.7 + i * 0.8)
+    }
+
+    const h = Math.min(dt, 0.05) / SUBSTEPS
+    for (let s = 0; s < SUBSTEPS; s += 1) {
+      for (let i = 0; i < 7; i += 1) springChain(PL_X, PL_V, PL_D, 3 * i, 3, h, PLUME_LIM)
+      springChain(WG_X, WG_V, WG_D, 0, NPRIM, h, WING_LIM)
+      springChain(CR_X, CR_V, CR_D, 0, NCREST, h, CREST_LIM)
+    }
+  }
+
+  // one wing chain at a given lag: sets elbow (ex, ey), wrist (wx, wy), angles a1, a2, and beat bb.
+  // The move blends the pose: folded round the body, or thrown wide. The beat stops while it does.
   function chain(ph, lag, e) {
-    bb = beat(ph - lag)
+    bb = beat(ph - lag) * (1 - 0.9 * mFold) * (1 - 0.9 * mSpread)
     const top1 = 1.38 - 0.12 * e
     const top2 = 1.62 - 0.1 * e
-    a1 = lerp(-0.4, top1, bb)
-    a2 = lerp(-0.7, top2, bb)
+    // the low end of the beat stays above the shoulder: wings held up and open, never drooping
+    let A1 = lerp(0.35, top1, bb)
+    let A2 = lerp(-0.2, top2, bb)
+    A1 = lerp(A1, FOLD1, mFold)
+    A2 = lerp(A2, FOLD2, mFold)
+    A1 = lerp(A1, PROUD1, mSpread)
+    A2 = lerp(A2, PROUD2, mSpread)
+    // a phone band: the wings open level instead of high, so the silhouette stays between the lines
+    const level = mBand * (1 - mFold) * (1 - mSpread)
+    A1 = lerp(A1, FLAT1, level)
+    A2 = lerp(A2, FLAT2, level)
+    a1 = A1
+    a2 = A2
     ex = SHOULDER[0] + UPPER * Math.cos(a1)
     ey = SHOULDER[1] + UPPER * Math.sin(a1)
     wx = ex + FORE * Math.cos(a2)
@@ -670,16 +936,18 @@ export function createCreature(THREE, { envMap, lite }) {
   }
 
   let headBob = 0
-  // the whole pose, a pure function of beat phase, time and energy
-  function pose(ph, time, e) {
+  // the whole pose, a pure function of beat phase, time, energy and the move envelopes.
+  // live = add the springs' lag (off for the build-time bounds)
+  function pose(ph, time, e, live) {
     headBob = 0.05 * Math.sin(TAU * (ph - 0.25)) + 0.03 * Math.sin(time * 0.9)
     headPivot.rotation.x = headBob
     headPivot.rotation.y = 0.06 * Math.sin(time * 0.55)
 
-    // crest: a fan of seven plumes that sweep back with energy
+    // crest: a fan of seven plumes that sweep back with energy, and flatten in the fold
     for (let i = 0; i < 7; i++) {
       const d = i - 3
-      const ang = HALF_PI + d * 0.2 - 0.3 * e + 0.1 * Math.sin(TAU * (ph - 0.3) - i * 0.6)
+      const ang =
+        HALF_PI + d * 0.2 - 0.3 * e - 0.6 * mFold + 0.1 * Math.sin(TAU * (ph - 0.3) - i * 0.6) + (live ? CR_X[i] : 0)
       const L = 0.38 + (0.12 * (3 - Math.abs(d))) / 3
       writeFeather(crestArr, CREST[i], RCR, NC, 1, CREST_ROOT[0] + d * 0.012, CREST_ROOT[1], CREST_ROOT[2], ang, L, 0.1, -0.55, 0.03)
     }
@@ -701,14 +969,14 @@ export function createCreature(THREE, { envMap, lite }) {
     ARM_PTS[12] = wx
     ARM_PTS[13] = wy
     ARM_PTS[14] = 0
-    for (const rec of WING) writeTube(wingArr, rec.arm, ARM_PTS, 5, ARM_RAD, 6, rec.mx)
+    for (const rec of WING) writeTube(wingArr, rec.arm, ARM_PTS, 5, ARM_RAD, 8, rec.mx)
 
     for (const rec of WING) {
       // primaries: fanned from the wrist, each one a beat behind the one before
       for (let i = 0; i < NPRIM; i++) {
         const f = i / (NPRIM - 1)
         chain(ph, 0.02 + 0.05 * f, e)
-        const ang = a2 - 0.2 - 0.5 * f + 0.6 * (1 - bb)
+        const ang = a2 - 0.2 - 0.5 * f + 0.6 * (1 - bb) + (live ? WG_X[i] : 0)
         const L = 0.82 + 0.34 * Math.sin(Math.PI * (0.15 + 0.7 * f))
         writeFeather(wingArr, rec.prim[i], RP, NC, rec.mx, wx, wy, -0.02 - 0.006 * i, ang, L, 0.075, lerp(-0.25, 0.85, bb), 0.04)
       }
@@ -769,15 +1037,16 @@ export function createCreature(THREE, { envMap, lite }) {
 
     // tail plumes: a travelling wave that runs down each plume, a beat behind the body
     const ph2 = TAU * (ph - 0.12)
-    const amp = 1 - 0.5 * e
+    const amp = (1 - 0.5 * e) * (1 - 0.6 * mFold)
     for (let i = 0; i < 7; i++) {
       const P = PC[i]
-      const L = PLUME_LEN[i]
+      const L = PLUME_LEN[i] * mTail * (1 - 0.45 * mBand)
       const d = i - 3
       for (let r = 0; r <= PN; r++) {
         const t = r / PN
         const ang = ph2 - t * 4.0 + i * 0.45
-        P.x[r] = PLUME_ROOT[0] + d * 0.05 + d * 0.16 * Math.pow(t, 1.2) + 0.12 * amp * t * t * Math.sin(ang)
+        P.x[r] =
+          PLUME_ROOT[0] + d * 0.05 + d * 0.16 * Math.pow(t, 1.2) + 0.12 * amp * t * t * Math.sin(ang) + (live ? plumeDisp(3 * i, t) : 0)
         P.y[r] = PLUME_ROOT[1] - L * t * (1 - 0.1 * t)
         P.z[r] = PLUME_ROOT[2] + 0.04 * t + 0.08 * amp * t * t * Math.cos(ang)
       }
@@ -803,7 +1072,7 @@ export function createCreature(THREE, { envMap, lite }) {
   grow(eyeArr, HEAD_PIVOT[0], HEAD_PIVOT[1])
   for (const e of [0, 1]) {
     for (let s = 0; s < 16; s += 2) {
-      pose(s / 16, 0, e)
+      pose(s / 16, 0, e, false)
       grow(wingArr, 0, 0)
       grow(tailArr, 0, 0)
       grow(teArr, 0, 0)
@@ -820,40 +1089,83 @@ export function createCreature(THREE, { envMap, lite }) {
   const k = 2 / Math.max(W, H)
   const cxC = (minX + maxX) / 2
   const cyC = (minY + maxY) / 2
-  const baseY = -cyC * k
+  // the model's centre sits on the group origin: the body shrinks and grows about its middle
+  kS = k
+  innerY = 0
+  // the body's transform before the first update: the same as update() sets it at scale 1
   inner.scale.setScalar(k)
-  inner.position.set(-cxC * k, baseY, 0)
+  inner.position.set(-cxC * k, -cyC * k, 0)
 
-  // embers
-  function stepEmbers(dt, e) {
-    emitAcc += dt * (4 + 10 * e)
+  // ---- sparks
+  function spawnSpark(x, y, vx, vy, life, size, drag, spin) {
+    const i = poolPtr
+    poolPtr = (poolPtr + 1) % EMBER_N
+    EX[i] = x
+    EY[i] = y
+    EZ[i] = 0.02
+    EVX[i] = vx
+    EVY[i] = vy
+    EAGE[i] = 0
+    ELIFE[i] = life
+    ESIZE[i] = size
+    EDRAG[i] = drag
+    ESPIN[i] = spin
+  }
+  // one wing-tip spark from the idle beat, in group space
+  function emitIdleSpark() {
+    emitSeq += 1
+    const tv = emitSeq & 1 ? TIP[0] : TIP[1]
+    if (emitSeq % 3 === 0) {
+      toG((hash(emitSeq * 1.9) - 0.5) * 0.2, -0.1, 0.3)
+    } else {
+      toG(wingArr[3 * tv] + (hash(emitSeq * 1.3) - 0.5) * 0.04, wingArr[3 * tv + 1] + 0.01, 0)
+    }
+    spawnSpark(gX, gY, (hash(emitSeq * 2.7) - 0.5) * 0.12, 0.12 + hash(emitSeq * 5.1) * 0.22, 1.1 + hash(emitSeq * 3.3), 0.045 + hash(emitSeq * 7.7) * 0.02, 0.6, 0)
+  }
+  // the outer primary tips of each wing (vertex indices), where sparks leave: last row, middle column
+  const MID = (NC - 1) >> 1
+  const TIP = [WING[0].prim[2] + RP * NC + MID, WING[1].prim[2] + RP * NC + MID]
+
+  // a flame puff in group space (the top line is never crossed by a birth)
+  function emitFlame(x, y, z, vx, vy, vz, size, life, heat) {
+    if (y > curTop - 0.12) return
+    flame.emit(x, y, z, vx, vy, vz, size, life, heat)
+  }
+  function rnd(n) {
+    return hash(n * 12.9898 + fseq * 0.37) * 2 - 1
+  }
+
+  function stepEmbers(dt, emitRate, pull, spin, top) {
+    emitAcc += dt * emitRate
     while (emitAcc >= 1) {
       emitAcc -= 1
-      const i = poolPtr
-      poolPtr = (poolPtr + 1) % EMBER_COUNT
-      emitSeq += 1
-      // most embers leave the wing tips; every third one rises from the breast
-      const fromBody = emitSeq % 3 === 0
-      const tv = emitSeq & 1 ? TIP[0] : TIP[1]
-      EX[i] = fromBody ? (hash(emitSeq * 1.9) - 0.5) * 0.2 : wingArr[3 * tv] + (hash(emitSeq * 1.3) - 0.5) * 0.04
-      EY[i] = fromBody ? -0.1 : wingArr[3 * tv + 1] + 0.01
-      EZ[i] = fromBody ? 0.3 : wingArr[3 * tv + 2] + 0.02
-      EVX[i] = (hash(emitSeq * 2.7) - 0.5) * 0.12
-      EVY[i] = 0.12 + hash(emitSeq * 5.1) * 0.22
-      EAGE[i] = 0
-      ELIFE[i] = 1.1 + hash(emitSeq * 3.3) * 1.0
-      ESIZE[i] = 0.03 + hash(emitSeq * 7.7) * 0.014
+      emitIdleSpark()
     }
-    for (let i = 0; i < EMBER_COUNT; i++) {
+    const pk = Math.min(1, pull * dt)
+    const cx = gcx
+    const cy = -cyC * kS + innerY
+    const sp = spin * dt
+    for (let i = 0; i < EMBER_N; i++) {
       if (EAGE[i] < ELIFE[i]) {
         EAGE[i] += dt
-        EX[i] += EVX[i] * dt
-        EY[i] += EVY[i] * dt
-        EVX[i] *= 1 - 0.6 * dt
-        EVY[i] += 0.04 * dt
+        // swirl around the centre, drift outward on the velocity, slow with drag and lift a little
+        const ca = Math.cos(ESPIN[i] * dt + sp)
+        const sa = Math.sin(ESPIN[i] * dt + sp)
+        const dx = EX[i] - cx
+        const dy = EY[i] - cy
+        EX[i] = cx + (dx * ca - dy * sa) * (1 - pk) + EVX[i] * dt
+        EY[i] = cy + (dx * sa + dy * ca) * (1 - pk) + EVY[i] * dt
+        const damp = 1 - EDRAG[i] * dt
+        EVX[i] *= damp > 0 ? damp : 0
+        EVY[i] *= damp > 0 ? damp : 0
+        EVY[i] += 0.05 * dt
         const u = EAGE[i] / ELIFE[i]
+        // a spark brightens, then cools: a short streak along its motion (scaled by speed)
+        const streak = 1 + Math.min(1.6, Math.hypot(EVX[i], EVY[i]) * 0.6)
+        let s = ESIZE[i] * Math.sin(Math.PI * u) * 2.2
+        if (EY[i] > top - 0.1) s = 0
         dummy.position.set(EX[i], EY[i], EZ[i])
-        dummy.scale.setScalar(ESIZE[i] * Math.sin(Math.PI * u))
+        dummy.scale.set(s > 0 ? s : 0, s > 0 ? s * streak : 0, 1)
       } else {
         dummy.position.set(0, 0, 0)
         dummy.scale.setScalar(0)
@@ -864,26 +1176,260 @@ export function createCreature(THREE, { envMap, lite }) {
     embers.instanceMatrix.needsUpdate = true
   }
 
-  let phase = 0
-  pose(0, 0, 0)
-  for (const g of [wingGeo, crestGeo, tailGeo]) g.computeVertexNormals()
+  // the move's flame and light, one frame. t = move clock, dt = step. Group space.
+  function stepMove(t, dt) {
+    const lim = Math.min(curTop, -curBot)
+    // the fireball fills the room it has: wide, not tall, on a phone
+    fireR = Math.max(0.2, Math.min(1.05, lim * 0.9))
+    fireSX = lim < 1.2 ? fireR * 1.3 : fireR
+    fireSY = lim < 1.2 ? fireR * 0.8 : fireR
+    const cy = -cyC * kS + innerY
+    const cx = gcx
 
-  function update(time, dt, energy) {
+    // gather: flame licks up from the breast and the wing edges
+    if (mGather > 0 && t < 2.2) {
+      const rate = 60 * mGather * (1 - rampT(t, 1.9, 2.2))
+      flameAcc += dt * rate
+      while (flameAcc >= 1) {
+        flameAcc -= 1
+        fseq += 1
+        const r = hash(fseq * 3.1)
+        if (r < 0.5) toG(rnd(fseq) * 0.12, -0.05 + 0.1 * r, 0.25)
+        else toG(0.45 * rnd(fseq + 1), 0.2 + 0.3 * r, 0)
+        const h = 0.5 + 0.35 * mGather
+        emitFlame(gX, gY, gZ, rnd(fseq + 5) * 0.12, 0.35 + 0.2 * r, 0.05, 0.14 + 0.1 * r * mGather, 0.6 + 0.4 * r, h)
+      }
+    }
+
+    // burn: the fireball closes over the bird
+    if (mBurnA > 0 && t < 2.8) {
+      const rate = 40 * mBurnA
+      flameAcc += dt * rate
+      while (flameAcc >= 1) {
+        flameAcc -= 1
+        fseq += 1
+        const a = hash(fseq * 7.3) * TAU
+        const rr = Math.sqrt(hash(fseq * 1.7))
+        const px = Math.cos(a) * rr * fireSX * 0.6
+        const py = Math.sin(a) * rr * fireSY * 0.6
+        const out = 0.2 + 0.25 * hash(fseq * 2.2)
+        // wide size and heat variance, so the fire breaks into hot cores and cooler tongues, not one plateau
+        const hot = 0.45 + 0.5 * hash(fseq * 9.1)
+        const sz = fireR * (0.1 + 0.3 * hash(fseq * 4.4))
+        emitFlame(cx + px, cy + py, 0.1 * rnd(fseq), Math.cos(a) * out, Math.sin(a) * out + 0.12, 0, sz, 0.9 + 0.4 * hash(fseq * 6.6), fseq % 4 === 0 ? 0.2 : hot)
+      }
+    }
+
+    // flash 1: a burst of fire outward as the bird goes into the light
+    if (!burst1 && t >= 2.05) {
+      burst1 = true
+      for (let j = 0; j < 16; j++) {
+        fseq += 1
+        const a = (j / 16) * TAU + rnd(fseq) * 0.35
+        const out = fireR * (0.8 + 0.5 * hash(fseq * 3.7))
+        emitFlame(cx, cy, 0, Math.cos(a) * out, Math.sin(a) * out, 0, fireR * 0.2, 1.1 + 0.4 * hash(fseq * 2.1), 0.8)
+      }
+    }
+
+    // ash: sparks burst out, hang, swirl. Slow, with drag.
+    if (!sparkBurst && t >= 2.2) {
+      sparkBurst = true
+      for (let j = 0; j < 60; j++) {
+        fseq += 1
+        const a = hash(fseq * 5.5) * TAU
+        const sp2 = (0.25 + 0.5 * hash(fseq * 8.8)) * (0.5 + 0.5 * fireR)
+        spawnSpark(cx, cy, Math.cos(a) * sp2, Math.sin(a) * sp2, 1.8 + 1.2 * hash(fseq * 1.3), 0.06 + 0.03 * hash(fseq * 0.9), 1.6, 0.6 * rnd(fseq))
+      }
+    }
+
+    // spiral in: the fire and the sparks draw in to one point
+    if (mSpiral > 0 && t < 3.6) {
+      const rate = 18 * mSpiral
+      flameAcc += dt * rate
+      while (flameAcc >= 1) {
+        flameAcc -= 1
+        fseq += 1
+        const a = hash(fseq * 2.9) * TAU
+        const rr = fireR * (0.9 - 0.5 * mSpiral) * (0.6 + 0.4 * hash(fseq * 3.3))
+        const px = cx + Math.cos(a) * rr
+        const py = cy + Math.sin(a) * rr
+        // swirl in: mostly round the centre, a little inward, so the puffs do not pile up in one spot
+        const sw = 0.9
+        emitFlame(px, py, 0, -Math.sin(a) * sw - Math.cos(a) * 0.35, Math.cos(a) * sw - Math.sin(a) * 0.35, 0, fireR * 0.2, 0.4, 0.75)
+      }
+    }
+
+    // flash 2: softer, at the one point
+    if (!burst2 && t >= 3.5) {
+      burst2 = true
+      for (let j = 0; j < 10; j++) {
+        fseq += 1
+        const a = (j / 10) * TAU + rnd(fseq) * 0.4
+        const out = fireR * (0.4 + 0.3 * hash(fseq * 1.9))
+        emitFlame(cx, cy, 0, Math.cos(a) * out, Math.sin(a) * out, 0, fireR * 0.2, 0.7, 0.75)
+      }
+      // the sparks let go of the point
+      for (let i = 0; i < EMBER_N; i++) {
+        if (EAGE[i] < ELIFE[i]) ELIFE[i] = EAGE[i] + 0.4
+      }
+    }
+
+    // unfolding: flame streams off the wing tips and the tail for a moment
+    if (mStream > 0 && t < 4.9) {
+      const rate = 34 * mStream
+      flameAcc += dt * rate
+      while (flameAcc >= 1) {
+        flameAcc -= 1
+        fseq += 1
+        const pick = hash(fseq * 4.9)
+        if (pick < 0.4) {
+          const tv = fseq & 1 ? TIP[0] : TIP[1]
+          toG(wingArr[3 * tv], wingArr[3 * tv + 1], wingArr[3 * tv + 2])
+          emitFlame(gX, gY, gZ, rnd(fseq) * 0.3, 0.5 + 0.3 * hash(fseq), 0, 0.12 + 0.06 * hash(fseq * 3.3), 0.5 + 0.3 * hash(fseq * 1.3), 1)
+        } else {
+          const j = pick < 0.7 ? 3 : 4
+          toG(PC[j].x[PN], PC[j].y[PN], PC[j].z[PN])
+          emitFlame(gX, gY, gZ, rnd(fseq) * 0.2, -0.3 - 0.3 * hash(fseq), 0, 0.1 + 0.05 * hash(fseq * 2.2), 0.45 + 0.3 * hash(fseq * 1.7), 1)
+        }
+      }
+    }
+  }
+
+  // the move's clock: set the envelopes from t (seconds) and the room
+  function applyMove(t) {
+    mGather = rampT(t, 0, 1.1)
+    mFold = mGather * (1 - rampT(t, 3.0, 3.6))
+    mTail = 1 - 0.3 * mGather * (1 - rampT(t, 2.0, 3.4))
+    mGlow = mGather * (1 - rampT(t, 2.1, 2.3)) + 0.9 * rampT(t, 3.6, 3.9) * (1 - rampT(t, 4.5, 5.2))
+    // the body goes into the flash (2.0 to 2.2), is gone, and comes back from the point (3.5 to 4.6)
+    if (t < 2.0) mScale = 1
+    else if (t < 2.2) mScale = 1 - smooth01((t - 2.0) / 0.2)
+    else if (t < 3.5) mScale = 0
+    else if (t < 4.6) {
+      const x = clamp01((t - 3.5) / 1.1)
+      mScale = 1 - (1 - x) * (1 - x) * (1 - x)
+    } else mScale = 1
+    mSpread = rampT(t, 3.6, 4.5) * (1 - rampT(t, 4.6, 5.2))
+    mSpiral = rampT(t, 2.9, 3.5) * (1 - rampT(t, 3.5, 3.7))
+    mStream = rampT(t, 3.7, 3.9) * (1 - rampT(t, 4.6, 4.9))
+    mBurnA = rampT(t, 1.0, 2.0) * (1 - rampT(t, 2.6, 3.0))
+  }
+
+  function setIdleEnvelopes() {
+    mFold = 0
+    mSpread = 0
+    mGlow = 0
+    mScale = 1
+    mTail = 1
+    mGather = 0
+    mSpiral = 0
+    mStream = 0
+    mBurnA = 0
+  }
+
+  // ---- the sculpt is gone: the code-built bird is the creature, desktop and lite.
+  let phase = 0
+  pose(0, 0, 0, false)
+  // a glow with exact-restore: the body sprite and the ring are hidden until the move calls for them
+  spriteMat.opacity = 0
+  ringMat.opacity = 0
+
+  function act() {
+    if (moveT >= 0) return
+    moveT = 0
+    burst1 = false
+    burst2 = false
+    sparkBurst = false
+    ringOn = false
+    flameAcc = 0
+  }
+
+  function update(time, dt, energy, motion) {
+    if (disposed) return
     const e = clamp01(energy)
-    phase += dt * (0.42 + 0.7 * e)
-    pose(phase, time, e)
-    inner.position.y = baseY + 0.03 * k * Math.sin(TAU * phase)
+    const step = dt > 0 ? (dt > 0.05 ? 0.05 : dt) : 0
+    phase += step * (0.42 + 0.7 * e)
+    physics(time, step, motion)
+
+    // room lines in group units: a creature width is size.x
+    const roomUp = motion && motion.roomUp !== undefined ? motion.roomUp : 9
+    const roomDown = motion && motion.roomDown !== undefined ? motion.roomDown : 9
+    curTop = roomUp * (W * k)
+    curBot = -roomDown * (W * k)
+
+    // the room sets the pose: a phone band (roomUp + roomDown about 0.8 widths) flattens it
+    mBand = clamp01((1.6 - (roomUp + roomDown)) / 0.8)
+
+    // the move's clock
+    if (moveT >= 0) {
+      moveT += step
+      if (moveT >= MOVE_LEN) moveT = -1
+    }
+    if (moveT >= 0) {
+      applyMove(moveT)
+    } else {
+      setIdleEnvelopes()
+    }
+
+    // place the body: scaled about its middle, bobbing with the beat
+    kS = k * (mScale > 0.001 ? mScale : 0.001)
+    innerY = 0.03 * k * Math.sin(TAU * phase)
+    inner.scale.setScalar(kS)
+    inner.position.set(-cxC * kS, -cyC * kS + innerY, 0)
+    gcx = -cxC * kS
+    wingMesh.position.z = 0.22 * mFold
+
+    pose(phase, time, e, true)
+    setGlow(mGlow)
+
     wingGeo.attributes.position.needsUpdate = true
-    wingGeo.computeVertexNormals()
     crestGeo.attributes.position.needsUpdate = true
-    crestGeo.computeVertexNormals()
     tailGeo.attributes.position.needsUpdate = true
-    tailGeo.computeVertexNormals()
     tailEyeGeo.attributes.position.needsUpdate = true
-    stepEmbers(dt, e)
+
+    // the fireball sprite and the ring: sized and clamped to the room
+    const lim = Math.min(curTop, -curBot)
+    const flashAmt = Math.min(1.5, flash01(moveT >= 0 ? moveT : 0, 2.0, 0.5) + flash01(moveT >= 0 ? moveT : 0, 3.5, 0.5))
+    const spriteOp = moveT >= 0 ? Math.min(0.85, 0.22 * mBurnA + 0.7 * flashAmt + 0.12 * mSpiral) : 0
+    const cy0 = -cyC * kS + innerY
+    if (moveT >= 0 && (mBurnA > 0 || flashAmt > 0 || mSpiral > 0)) {
+      const sz = Math.min(fireR * 1.7 * (0.85 + 0.15 * mBurnA) + 0.6 * flashAmt * fireR, Math.max(0.2, 2 * lim * 0.7))
+      glowSprite.position.set(gcx, cy0, 0.05)
+      glowSprite.scale.set(sz * (fireSX / fireR), sz * (fireSY / fireR), 1)
+      spriteMat.opacity = spriteOp
+      const hot = 1 + 0.6 * flashAmt
+      spriteMat.color.setRGB(hot * 1.5, hot * 0.7, hot * 0.22)
+    } else {
+      spriteMat.opacity = 0
+    }
+
+    // the ring rolls off the bird at 4.2 to 5.0 (and is always off outside that window)
+    if (moveT < 4.2 || moveT >= 5.0) ringMat.opacity = 0
+    if (moveT >= 4.2 && moveT < 5.0) {
+      const x = (moveT - 4.2) / 0.8
+      const rr = Math.max(0.05, Math.min(fireR * 1.3, lim * 0.9) * (0.25 + 0.75 * x))
+      ring.position.set(gcx, cy0, 0.03)
+      ring.scale.set(2 * rr, 2 * rr, 1)
+      ringMat.opacity = 0.9 * Math.pow(1 - x, 1.2)
+      ringMat.color.setRGB(3.2, 1.9, 0.8)
+      ringOn = true
+    } else if (ringOn) {
+      ringOn = false
+      ringMat.opacity = 0
+    }
+
+    // flame and sparks: emit during the move, step always
+    if (moveT >= 0 && step > 0) stepMove(moveT, step)
+    const emitRate = moveT >= 0 ? 4 + 10 * e + 10 * mStream : 4 + 10 * e
+    const pull = 3.0 * mSpiral
+    stepEmbers(step, emitRate, pull, 0.8 * mSpiral, curTop)
+    // the flame's own limits are pulled in by its largest puff, so its ink stays off the lines
+    flame.update(step, time, curTop - 0.3, curBot + 0.3)
   }
 
   function dispose() {
+    disposed = true
+    flame.dispose()
     bodyGeo.dispose()
     headGeo.dispose()
     eyeGeo.dispose()
@@ -895,16 +1441,24 @@ export function createCreature(THREE, { envMap, lite }) {
     featherMat.dispose()
     glowMat.dispose()
     embMat.dispose()
+    spriteMat.dispose()
+    ringMat.dispose()
+    planeGeo.dispose()
     embGeo.dispose()
     embers.dispose()
+    ring.geometry.dispose()
     bodyTex.dispose()
     barbTex.dispose()
+    glowTex.dispose()
+    ringTex.dispose()
+    if (group.parent) group.removeFromParent()
   }
 
   return {
     group,
     size: { x: W * k, y: H * k },
     update,
+    act,
     dispose,
   }
 }

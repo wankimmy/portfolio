@@ -113,6 +113,6 @@ export const FORMATIONS = {
     spin: 0.16,
     spread: 0.9,
     // phones: the world sits behind the dragon like a halo and rides the page with it
-    tall: { follow: 'dragon', x: 0, y: -0.05, z: -0.9, spread: 1.7 },
+    tall: { follow: 'dragon', x: 0, y: 0, z: -0.9, spread: 1.45 },
   },
 }

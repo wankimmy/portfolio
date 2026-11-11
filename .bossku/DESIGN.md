@@ -68,8 +68,21 @@ Dials: variance 9, motion 9, density 3.
   a scene enters (`src/world/scenes.js`) and banks with scroll speed. One GSAP ticker drives Lenis, ScrollTrigger
   and the WebGL render. The dragon's wing beat is driven in code (`dragonFlight.js`): a quick push down, a slower
   recovery, the wing tips a beat behind the shoulder, the body riding the lift.
+- Physics: every creature gets its own velocity and turn rate from the world and answers with damped springs
+  (tails, fins, whiskers, plumes, the dragon's bank and wing give).
+- Signature moves (owner asked, 2026-11-11): each creature performs one when it arrives where it has the stage,
+  every 15 s while it stays, and on a tap. Dragon: draws breath, turns to profile, breathes fire. Naga: pearl
+  tide, a stream of water pearls and mist. Sky whale: a fountain of stars from its blowhole and three rings of
+  song. Phoenix: rebirth, it burns away in a fireball and unfolds new. Fire must look real (owner rule): flames
+  are noise-eroded billboards with a hot core, tongues, sparks and smoke (`src/world/flame.js`), not shards.
 - Creatures never sit under the header or the copy by accident: where the page leaves them a box (`data-stage`),
   they fit themselves to it. Phones show a creature only in such a box: the hero, the encounters, the footer.
+- Phones, no overlaps (owner rule, 2026-11-11): a box is clipped at the header and above the chat button, the
+  creature shrinks away with it, it enters and leaves sideways, every move reads the room it has, and as a last
+  guard everything a creature draws is cut off at the edges of its box. `node tools/audit_phone.mjs` proves it
+  pixel by pixel at six phone sizes; run it before every release.
+- Wide screens: the hero dragon's fire passes behind the name for a moment. The name keeps a soft dark shadow
+  for that.
 - Signature touchpoints: title screen sigil, hero, encounters, crystal formations, pause menu, the 3D sigil inside
   the finished world at the footer.
 - No on-page motion switch (owner removed it, 2026-11-11). The operating system's reduced-motion setting still
@@ -92,5 +105,9 @@ Dials: variance 9, motion 9, density 3.
 
 - The site is a client-rendered Vue app, so with JavaScript off only the `<noscript>` summary shows.
 - Dragon geometry comes from one AI-generated mesh; the build adds surface detail, not new anatomy.
-- The naga, sky whale and phoenix are modelled and animated in code (`src/world/creatures/`), with generated
-  surface textures. They are stylised next to the dragon's baked hide.
+- The sky whale is sculpted like the dragon (Hunyuan3D from a clay render, baked by `tools/build_creature.py`)
+  and wrapped onto its code-built body, which stays as a hidden rig. The same wrap tore on the naga's crossing
+  coil and on the phoenix's feathered wings, so those two stay modelled in code (`src/world/creatures/`),
+  flat-shaded like the dragon with generated surface relief. The phoenix's head is the plainest part.
+- On a 320x568 phone the footer dragon has slid under the header by the time the page ends: it is seen while
+  scrolling in, not at the very last scroll position.

@@ -13,6 +13,10 @@
  * scale 1 fits it. Boxes are how a creature stays clear of the copy on any
  * screen size.
  *
+ * A role may add `aim: { yaw, pitch }`: where the creature points its signature
+ * move on screen (the dragon's fire), chosen so it crosses open sky and not the
+ * copy. Without it the creature picks from the room it has.
+ *
  * veil: how far the sky is dimmed so the text over it keeps its contrast.
  *
  * `wide` is landscape layouts, `tall` is phones. On phones the reading column
@@ -23,7 +27,8 @@ const FLAT = { pitch: 0, roll: 0 }
 
 export const SCENES = {
   wide: {
-    home: { veil: 0, cast: { dragon: { x: 0.5, y: 0.2, scale: 0.92, yaw: -0.34, pitch: 0.04, roll: 0 } } },
+    // high enough that its fire runs left along the strip of sky above the headline
+    home: { veil: 0, cast: { dragon: { x: 0.5, y: 0.3, scale: 0.92, yaw: -0.34, pitch: 0.04, roll: 0, aim: { yaw: -1.42, pitch: 0.46 } } } },
     about: { veil: 0.7, cast: { dragon: { x: 0.9, y: 0.52, scale: 0.78, yaw: -0.75, pitch: 0.22, roll: -0.08 } } },
     'encounter-naga': { veil: 0.1, cast: { naga: { box: true, x: 0, y: 0, scale: 1, yaw: 0, ...FLAT } } },
     tech: { veil: 0.74, cast: { naga: { x: 0, y: 0, scale: 0.86, yaw: 0.15, pitch: 0.05, roll: 0 } } },
@@ -36,12 +41,13 @@ export const SCENES = {
     certificates: { veil: 0.74, cast: { dragon: { x: 0.88, y: -0.44, scale: 0.4, yaw: -0.7, pitch: -0.1, roll: 0 } } },
     'star-map': { veil: 0.9, cast: {} },
     // the dragon hovers over the finished world (see formations.js), clear of the last headline
-    contact: { veil: 0.15, cast: { dragon: { x: 0.56, y: 0.5, scale: 0.56, yaw: -0.25, pitch: 0.22, roll: 0 } } },
+    contact: { veil: 0.15, cast: { dragon: { x: 0.56, y: 0.6, scale: 0.56, yaw: -0.25, pitch: 0.22, roll: 0, aim: { yaw: -1.42, pitch: 0.34 } } } },
   },
   tall: {
-    home: { veil: 0, cast: { dragon: { box: true, x: 0, y: 0, scale: 0.97, yaw: -0.16, pitch: 0.04, roll: 0 } } },
+    home: { veil: 0, cast: { dragon: { box: true, x: 0, y: 0, scale: 0.9, yaw: -0.16, pitch: 0.04, roll: 0 } } },
     about: { veil: 0.88, cast: {} },
-    'encounter-naga': { veil: 0.1, cast: { naga: { box: true, x: 0, y: 0, scale: 1, yaw: 0, ...FLAT } } },
+    // a little smaller than its box: the whiskers and tail fan swing past the rest silhouette
+    'encounter-naga': { veil: 0.1, cast: { naga: { box: true, x: 0, y: 0, scale: 0.9, yaw: 0, ...FLAT } } },
     tech: { veil: 0.86, cast: {} },
     'encounter-whale': { veil: 0.1, cast: { whale: { box: true, x: 0, y: 0, scale: 1, yaw: 0, ...FLAT } } },
     experience: { veil: 0.9, cast: {} },
@@ -52,7 +58,7 @@ export const SCENES = {
     certificates: { veil: 0.9, cast: {} },
     'star-map': { veil: 0.92, cast: {} },
     // in front of the finished world, which sits behind it like a halo
-    contact: { veil: 0.2, cast: { dragon: { box: true, x: 0, y: 0, scale: 0.94, yaw: 0, pitch: 0.1, roll: 0 } } },
+    contact: { veil: 0.2, cast: { dragon: { box: true, x: 0, y: 0, scale: 0.84, yaw: 0, pitch: 0.1, roll: 0 } } },
   },
 }
 
@@ -62,7 +68,15 @@ export const SCENE_IDS = Object.keys(SCENES.wide)
 /** An encounter takes the stage a little before its band reaches the reading line. */
 export const isEncounter = (id) => id.startsWith('encounter-')
 
-/** Where each creature waits off stage: its way in and its way out. */
+/**
+ * Phones: a creature leaves and arrives sideways, at the height of its own box,
+ * so it never crosses the header above it or the copy below it. The number is
+ * the side it uses (-1 left, +1 right); x is in half-boxes, far past the edge.
+ */
+export const SIDE = { dragon: -1, naga: 1, whale: -1, phoenix: 1 }
+export const OFF_SIDE = 6
+
+/** Where each creature waits off stage on wide screens: its way in and its way out. */
 export const PARK = {
   dragon: { x: 0.1, y: 1.6, scale: 0.6, yaw: 0.9, pitch: 0.5, roll: 0.2 },
   naga: { x: 2.1, y: -0.15, scale: 0.8, yaw: 0.5, pitch: 0, roll: 0 },

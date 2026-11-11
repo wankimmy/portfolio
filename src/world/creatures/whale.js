@@ -1,7 +1,13 @@
 /**
  * The sky whale: an enormous, slow humpback that swims through the night sky with
- * the traveller's quest log on its back. Self-contained: THREE is passed in and
- * nothing is imported.
+ * the traveller's quest log on its back. THREE is passed in; the only import is the
+ * sculpt wrap (src/world/wrapSculpt.js).
+ *
+ * The code-built whale is the RIG: it holds the picture's pose and moves. The baked
+ * sculpt (public/models/creature-whale.glb, made by tools/build_creature.py) is wrapped
+ * onto it once the download lands, and then follows the rig every frame. Until then,
+ * or if the download fails, the code-built whale is shown as it always was.
+ *
  *
  * Anatomy, snout to tail:
  *  - body: one smooth lofted skin along a gently arching spine. Rings are denser
@@ -19,7 +25,19 @@
  *  - surface: generated normal maps (mottling, scars, belly pleats, fin rays).
  */
 
+import { createSculptWrap } from '../wrapSculpt.js'
+
 const TAU = Math.PI * 2
+const MODEL_URL = '/models/creature-whale.glb'
+const MODEL_URL_LITE = '/models/creature-whale-lite.glb'
+// the picture the sculpt was made from: the rig at this time, turned by (pitch, yaw)
+const PICTURE = { t: 1.2, yaw: 0.55, pitch: 0.06 }
+const SP_K = 40 // spring stiffness (rad/s squared), natural rate about 6.3 rad/s
+const SP_C = 5 // damping: zeta about 0.4, so a shove overshoots a little and settles
+const FIN_NODES = 4 // springs per pectoral fin: root, then three lagging nodes
+const FLUKE_NODES = 3
+const TAIL_NODES = 4
+const TAIL_FROM = 0.55 // the tail springs start this far along the body
 const BL = 2.3 // body length, snout (+x) to tail stock (-x)
 const XH = BL / 2
 const K_WAVE = 2.4 // spine wave number along the body
@@ -38,6 +56,16 @@ const FLUKE_LEN = 0.6
 const FLUKE_REST = 0.3 // radians, tips raised at rest
 const DORSAL_F = 0.72
 const EYE_F = 0.2
+const STRETCH_MAX = 2.2 // a sculpt triangle whose edges grow past this after binding is dropped (torn)
+const SLICE_MS = 4 // the most work the sculpt fit does in one turn of the page
+// the signature move, in seconds from act(); a width is the creature's own width (size.x)
+const MOVE_LEN = 5.4
+const ROLL_MAX = 1.33 // radians: a slow, nearly quarter turn of a forty-ton body
+const SPOUT_T0 = 1.3 // when the first star leaves the blowhole
+const BLOW_F = 0.17 // the blowhole: on the crown, just behind the head's highest point
+const GRAV = 1.1 // widths per second squared: slow, like a heavy body in water
+const RING_T0 = 2.3 // the first of three singing rings
+const RING_LIFE = 2.1
 
 // half height of the body along its length (u: 0 snout .. 1 tail stock), before caps
 const HH_KEYS = [
@@ -72,7 +100,40 @@ function curve(pts, u) {
   }
   return pts[pts.length - 1][1]
 }
+// a damped spring chain: node 0 (X[base]) is pinned to the body, nodes 1..n-1 are each
+// pulled toward the node before them, so the tip lags last. drive is the motion input
+// (clamped by the caller), gain sets how hard it pushes. Stable for dt up to 0.05.
+function stepChain(X, V, base, n, drive, gain, time, dt, lim, phase) {
+  for (let i = 1; i < n; i += 1) {
+    const k = base + i
+    const w = i / (n - 1)
+    const idle = 0.3 * Math.sin(2.1 * time + phase + i) // a small life when nothing moves, so a kick settles
+    const acc = -SP_K * (X[k] - X[k - 1]) - SP_C * V[k] + gain * drive * w + idle
+    let v = V[k] + acc * dt
+    let x = X[k] + v * dt
+    if (x > lim) {
+      x = lim
+      v = 0
+    } else if (x < -lim) {
+      x = -lim
+      v = 0
+    }
+    V[k] = v
+    X[k] = x
+  }
+}
+// the chain's value at q (0 root .. 1 tip), linearly between its nodes
+function nodeAt(X, base, n, q) {
+  const f = q * (n - 1)
+  const i = Math.min(n - 2, Math.floor(f))
+  const t = f - i
+  return X[base + i] * (1 - t) + X[base + i + 1] * t
+}
+
 // the snout rounds off to a blunt, rounded rostrum (no flat disc); the tail stock tapers
+// how much the head lifts and the back arches during the move, along the body (local units)
+const archShape = (u) => 0.22 * (1 - smooth(0, 0.5, u)) + 0.16 * Math.exp(-(((u - 0.32) / 0.2) ** 2))
+
 const capOf = (u) => {
   if (u < 0.14) return Math.max(0.07, Math.sqrt(Math.max(0, 1 - ((0.14 - u) / 0.14) ** 2)))
   if (u > 0.96) return Math.max(0.2, Math.sqrt(Math.max(0, 1 - ((u - 0.96) / 0.04) ** 2)))
@@ -431,24 +492,37 @@ export function createCreature(THREE, { envMap, lite }) {
   const CUR_RO = new Float32Array(NR)
   const CUR_CX = new Float32Array(NR)
   const CUR_CY = new Float32Array(NR)
+  const CUR_CZ = new Float32Array(NR)
+  const tailZ = new Float32Array(NR) // sideways lag of the tail stock, from its springs
+  // the move's pose terms, set by updateMove each frame (all zero at rest)
+  let mArch = 0 // the head lift and back arch
+  let mRoll = 0 // the slow roll about the body's own axis
+  let mFinSweep = 0 // the pectoral fins sweeping wide, late
+  let mBeat = 0 // the fluke's one deep beat
+  let mRoom = 1 // 1 with room to spare, 0 on a phone's narrow band: lowers and flattens the move
+  let mUp = 1.5 // open space above and below the creature, in widths (the move keeps inside these)
+  let mDown = 1.5
+  let frameY = 0 // the centre of the framed sculpt, in group units: the screen centre (set by the bind)
 
   function placeSpine(time, e) {
     const w = (TAU / PERIOD) * (1 + 1.1 * e)
     const amp = 1 + 0.8 * e
-    for (let i = 0; i < NR; i += 1) DY[i] = AMP[i] * amp * Math.sin(w * time - K_WAVE * U[i])
+    for (let i = 0; i < NR; i += 1) DY[i] = AMP[i] * amp * Math.sin(w * time - K_WAVE * U[i]) + mArch * archShape(U[i])
     for (let i = 0; i < NR; i += 1) {
       const a = Math.max(0, i - 1)
       const b = Math.min(NR - 1, i + 1)
       const slope = (DY[b] - DY[a]) / (X[b] - X[a])
       const th = TH_REST[i] + Math.atan(slope)
-      const ro = 0.05 * (1 + 0.5 * e) * Math.sin(0.55 * w * time - 1.1 * U[i])
+      const ro = 0.05 * (1 + 0.5 * e) * Math.sin(0.55 * w * time - 1.1 * U[i]) + mRoll
       const cx = X[i]
       const cy = YC[i] + DY[i]
+      const cz = tailZ[i]
       CUR_TH[i] = th
       CUR_RO[i] = ro
       CUR_CX[i] = cx
       CUR_CY[i] = cy
-      frames[i].position.set(cx, cy, 0)
+      CUR_CZ[i] = cz
+      frames[i].position.set(cx, cy, cz)
       frames[i].rotation.set(ro, 0, th, 'ZXY')
       frames[i].updateMatrix()
 
@@ -464,7 +538,7 @@ export function createCreature(THREE, { envMap, lite }) {
         const Zr = Y * sr + Z * cr
         bodyPos[k * 3] = cx - st * Yr
         bodyPos[k * 3 + 1] = cy + ct * Yr
-        bodyPos[k * 3 + 2] = Zr
+        bodyPos[k * 3 + 2] = Zr + cz
       }
     }
     // centre vertices sit on the spine at each end
@@ -486,7 +560,7 @@ export function createCreature(THREE, { envMap, lite }) {
     const Zr = Y * sr + Z * cr
     out[o] = CUR_CX[i] - st * Yr
     out[o + 1] = CUR_CY[i] + ct * Yr
-    out[o + 2] = Zr
+    out[o + 2] = Zr + CUR_CZ[i]
   }
   placeSpine(0, 0)
 
@@ -579,7 +653,10 @@ export function createCreature(THREE, { envMap, lite }) {
   const finRoot = new Float32Array(2)
   sectionYZ(U[finRing], FIN_REST_PHI, finRoot, 0)
   const fins = []
+  const finX = new Float64Array(2 * FIN_NODES) // flex springs, two fins x FIN_NODES
+  const finV = new Float64Array(2 * FIN_NODES)
   function buildFin(side, phase) {
+    const fi = fins.length
     const f = makeFoil(FIN_S, FIN_K)
     const D = norm3([-0.42, -0.5, 0.76 * side])
     const C = chordFor(D)
@@ -602,12 +679,13 @@ export function createCreature(THREE, { envMap, lite }) {
       const amp = 0.08 + 0.14 * e
       for (let s = 0; s < FIN_S; s += 1) {
         const q = s / (FIN_S - 1)
-        const flex = amp * q ** 1.3 * Math.sin(w * time + phase - 2.6 * q)
+        // the spring lag adds to the flapping: the tip trails behind a shove
+        const flex = amp * q ** 1.3 * Math.sin(w * time + phase - 2.6 * q) + 0.5 * nodeAt(finX, fi * FIN_NODES, FIN_NODES, q)
         const len = FIN_LEN * q
         const sweep = 0.06 * q * q
         f.P[s * 3] = root[0] + D[0] * len + f.N[s * 3] * flex + f.C[s * 3] * sweep
         f.P[s * 3 + 1] = root[1] + D[1] * len + f.N[s * 3 + 1] * flex + f.C[s * 3 + 1] * sweep
-        f.P[s * 3 + 2] = root[2] + D[2] * len + f.N[s * 3 + 2] * flex + f.C[s * 3 + 2] * sweep
+        f.P[s * 3 + 2] = root[2] + D[2] * len + f.N[s * 3 + 2] * flex + f.C[s * 3 + 2] * sweep + side * mFinSweep * 0.5 * q ** 1.2
       }
       f.write()
     }
@@ -628,6 +706,8 @@ export function createCreature(THREE, { envMap, lite }) {
   // ---- flukes: two foil lobes with a centre notch and scalloped trailing edge --
   const flukeFoils = []
   const flukeUpdates = []
+  const flukeX = new Float64Array(2 * FLUKE_NODES) // lag springs, two lobes x FLUKE_NODES
+  const flukeV = new Float64Array(2 * FLUKE_NODES)
   for (let lobe = 0; lobe < 2; lobe += 1) {
     const f = makeFoil(FLUKE_S, FLUKE_K)
     const sgn = lobe === 0 ? 1 : -1
@@ -652,7 +732,7 @@ export function createCreature(THREE, { envMap, lite }) {
       for (let s = 0; s < FLUKE_S; s += 1) {
         const q = s / (FLUKE_S - 1)
         // the tip lags, and the amplitude eases off toward the lobe tips for a smoother bend
-        const alpha = FLUKE_REST + amp * Math.sin(w * time - 2.2 - 1.0 * q) * q * 0.75
+        const alpha = FLUKE_REST + amp * Math.sin(w * time - 2.2 - 1.0 * q) * q * 0.75 + nodeAt(flukeX, lobe * FLUKE_NODES, FLUKE_NODES, q) - mBeat * 0.7 * q
         const dy = Math.sin(alpha)
         const dz = sgn * Math.cos(alpha)
         f.P[s * 3] = -0.02
@@ -698,23 +778,29 @@ export function createCreature(THREE, { envMap, lite }) {
   // ---- eyes: small, dark, low on the side, a lighter lid and one HDR glint -------
   const eyeRing = ringOf(EYE_F)
   const eyeMat = new THREE.MeshBasicMaterial({ vertexColors: true })
+  const eyeLocal = [] // [ey, ez] of each eye on its ring, for seating the eyes on the sculpt
+  let eyeSplit = 0 // vertex index where the second eye starts
+  let eyeGeo = null
   {
     const b = Buf()
-    const iris = new THREE.Color(0.02, 0.035, 0.09)
-    const glint = lite ? new THREE.Color(1.5, 1.5, 1.6) : new THREE.Color(1.8, 1.84, 2.0)
+    const iris = new THREE.Color(0.005, 0.01, 0.03)
+    const glint = lite ? new THREE.Color(1.6, 1.25, 0.6) : new THREE.Color(2.0, 1.5, 0.7) // gold, like the crystal
     for (let side = 0; side < 2; side += 1) {
       const sgn = side === 0 ? 1 : -1
       const phi = side === 0 ? -0.22 : Math.PI + 0.22 // low on the side, behind the mouth corner
       sectionYZ(U[eyeRing], phi, sec, 0)
       const ey = sec[0]
       const ez = sec[1] * 0.99
-      addSphere(b, 0, ey, ez + sgn * 0.004, 0.03, iris, 12, 8) // the dark iris, sunk in the skin
-      addSphere(b, 0, ey + 0.008, ez + sgn * 0.024, 0.006, glint, 6, 4) // one small glint
+      addSphere(b, 0, ey, ez + sgn * 0.004, 0.04, iris, 12, 8) // the dark iris, sunk in the skin
+      addSphere(b, 0, ey + 0.012, ez + sgn * 0.03, 0.012, glint, 6, 4) // one gold glint, larger so it reads
+      eyeLocal.push([ey, ez])
+      if (side === 0) eyeSplit = b.p.length / 3
     }
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3))
     geo.setAttribute('color', new THREE.Float32BufferAttribute(b.c, 3))
     geo.setIndex(b.i)
+    eyeGeo = geo
     const eyes = new THREE.Mesh(geo, eyeMat)
     eyes.frustumCulled = false
     frames[eyeRing].add(eyes)
@@ -863,6 +949,314 @@ export function createCreature(THREE, { envMap, lite }) {
   }
   placeFreckles()
 
+  // ---- the signature move: the spout, the mist, the crown of stars and three singing rings ----
+  // all of it sits in the rig's own frame (bodyRoot), so it rolls and rises with the body.
+  // every piece is a pool: instances and points are placed each frame from pure functions of time
+  const blowRing = ringOf(BLOW_F)
+  const blowSec = new Float32Array(2)
+  sectionYZ(U[blowRing], Math.PI / 2, blowSec, 0) // the top of the crown, at rest
+  const blowP = new Float64Array(3) // the blowhole, rig frame, this frame
+  const perWidth = () => size.x / (holder.scale.x * group.scale.x) // rig units per creature width
+  const SH_N = lite ? 48 : 96 // star shards
+  const SETTLE_N = lite ? 12 : 24 // the shards that come down onto the back and glint there
+  const MIST_N = lite ? 40 : 110
+  const shardGeo = new THREE.OctahedronGeometry(1, 0)
+  shardGeo.scale(0.4, 1.8, 0.4) // long and thin, like a splinter of ice
+  const shardMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })
+  const shards = new THREE.InstancedMesh(shardGeo, shardMat, SH_N)
+  shards.frustumCulled = false
+  shards.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+  const shardCol = new THREE.Color()
+  const zeroM = new THREE.Matrix4().makeScale(0, 0, 0)
+  for (let k = 0; k < SH_N; k += 1) {
+    if (k % 12 === 5) shardCol.setRGB(lite ? 1.1 : 2.2, lite ? 0.85 : 1.6, lite ? 0.5 : 0.8) // one gold in twelve
+    else {
+      // most shards stay under the bloom threshold, a few are HDR so they catch the light
+      const b = lite || k % 4 !== 0 ? 1.0 : 1.45 + 0.1 * hash(k + 40)
+      shardCol.setRGB(b * 0.9, b * 0.98, b * 1.08) // ice white, a little blue
+    }
+    shards.setColorAt(k, shardCol)
+    shards.setMatrixAt(k, zeroM)
+  }
+  shards.instanceColor.needsUpdate = true
+  bodyRoot.add(shards)
+  // a soft glow behind each shard: additive points on a generated radial texture, HDR so desktop blooms
+  const glowCanvas = document.createElement('canvas')
+  glowCanvas.width = 64
+  glowCanvas.height = 64
+  {
+    const ctx = glowCanvas.getContext('2d')
+    const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32)
+    g.addColorStop(0, 'rgba(255,255,255,1)')
+    g.addColorStop(0.16, 'rgba(255,255,255,0.6)')
+    g.addColorStop(0.45, 'rgba(255,255,255,0.14)')
+    g.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, 64, 64)
+  }
+  const glowTex = new THREE.CanvasTexture(glowCanvas)
+  const glowPos = new Float32Array(SH_N * 3)
+  const glowCol = new Float32Array(SH_N * 3)
+  const glowGeo = new THREE.BufferGeometry()
+  glowGeo.setAttribute('position', new THREE.BufferAttribute(glowPos, 3))
+  glowGeo.setAttribute('color', new THREE.BufferAttribute(glowCol, 3))
+  const glowMat = new THREE.PointsMaterial({
+    map: glowTex,
+    vertexColors: true,
+    size: 0.2,
+    sizeAttenuation: true,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  })
+  const glow = new THREE.Points(glowGeo, glowMat)
+  glow.frustumCulled = false
+  bodyRoot.add(glow)
+  // the shards that settle: where each one lands on the back (rig frame, at rest)
+  const setRing = new Uint16Array(SETTLE_N)
+  const setY = new Float32Array(SETTLE_N)
+  const setZ = new Float32Array(SETTLE_N)
+  const setSec = new Float32Array(2)
+  for (let k = 0; k < SETTLE_N; k += 1) {
+    const r = ringOf(0.28 + 0.42 * hash(k + 900))
+    const phi = Math.PI / 2 + (hash(k + 910) - 0.5) * 1.2
+    sectionYZ(U[r], phi, setSec, 0)
+    setRing[k] = r
+    setY[k] = setSec[0] + 0.012 // a hair above the skin
+    setZ[k] = setSec[1]
+  }
+  // the mist: soft points at the base of the spout
+  const mistPos = new Float32Array(MIST_N * 3)
+  const mistGeo = new THREE.BufferGeometry()
+  mistGeo.setAttribute('position', new THREE.BufferAttribute(mistPos, 3))
+  const mistCanvas = document.createElement('canvas')
+  mistCanvas.width = 64
+  mistCanvas.height = 64
+  {
+    const ctx = mistCanvas.getContext('2d')
+    const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32)
+    g.addColorStop(0, 'rgba(255,255,255,0.9)')
+    g.addColorStop(0.4, 'rgba(255,255,255,0.25)')
+    g.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, 64, 64)
+  }
+  const mistTex = new THREE.CanvasTexture(mistCanvas)
+  const mistMat = new THREE.PointsMaterial({
+    map: mistTex,
+    color: lite ? new THREE.Color(0.7, 0.8, 0.95) : new THREE.Color(1.0, 1.1, 1.3),
+    size: 0.34,
+    sizeAttenuation: true,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  })
+  const mist = new THREE.Points(mistGeo, mistMat)
+  mist.frustumCulled = false
+  bodyRoot.add(mist)
+  // the three rings: flat, thin, spreading from the head as they fade
+  // a soft annulus: a generated alpha texture on a flat disc, so each ring is a wave of light with soft edges
+  const ringCanvas = document.createElement('canvas')
+  ringCanvas.width = 128
+  ringCanvas.height = 128
+  {
+    const ctx = ringCanvas.getContext('2d')
+    const img = ctx.createImageData(128, 128)
+    for (let y = 0; y < 128; y += 1) {
+      for (let x = 0; x < 128; x += 1) {
+        const r = Math.hypot((x + 0.5 - 64) / 64, (y + 0.5 - 64) / 64)
+        const a = Math.exp(-(((r - 0.8) / 0.1) ** 2)) * (1 - smooth(0.92, 1, r))
+        const o = (y * 128 + x) * 4
+        img.data[o] = 255
+        img.data[o + 1] = 255
+        img.data[o + 2] = 255
+        img.data[o + 3] = Math.round(255 * a)
+      }
+    }
+    ctx.putImageData(img, 0, 0)
+  }
+  const ringTex = new THREE.CanvasTexture(ringCanvas)
+  const ringGeo = new THREE.PlaneGeometry(2, 2)
+  ringGeo.rotateX(Math.PI / 2) // lies flat, in the plane of the sky
+  const ringList = []
+  for (let i = 0; i < 3; i += 1) {
+    const mat = new THREE.MeshBasicMaterial({
+      map: ringTex,
+      color: lite ? new THREE.Color(0.8, 0.9, 1.0) : new THREE.Color(1.2, 1.35, 1.6),
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    })
+    const mesh = new THREE.Mesh(ringGeo, mat)
+    mesh.frustumCulled = false
+    mesh.visible = false
+    bodyRoot.add(mesh)
+    ringList.push({ mesh, mat })
+  }
+  // the spout's own meshes: the body wrap must not bind to them, and the rig hide must not hide them
+  const spoutMeshes = new Set([shards, mist, ...ringList.map((r) => r.mesh)])
+
+  const spQ = new THREE.Quaternion()
+  const spAxis = new THREE.Vector3(0, 1, 0)
+  const spP = new THREE.Vector3()
+  const spS = new THREE.Vector3()
+  const spM = new THREE.Matrix4()
+  const surf = new Float64Array(3)
+  let moveT0 = -1 // the clock time the move began, -1 when idle
+  let pendingAct = false // act() was called: the move starts at the next update
+  let clockNow = 0
+
+  // the move's pose terms, at its time m (seconds into the move), and the room it has
+  function updateMove(time, dt, motion) {
+    if (pendingAct) {
+      pendingAct = false
+      moveT0 = time
+    }
+    const m = moveT0 < 0 ? -1 : time - moveT0
+    if (m < 0 || m >= MOVE_LEN) {
+      moveT0 = -1
+      mArch = 0
+      mRoll = 0
+      mFinSweep = 0
+      mBeat = 0
+      return
+    }
+    // the move keeps to the band: on a narrow band (a phone) the arch, roll and spout are smaller
+    mUp = motion && motion.roomUp !== undefined ? motion.roomUp : 1.5
+    mDown = motion && motion.roomDown !== undefined ? motion.roomDown : 1.5
+    mRoom += (clamp((mUp - 0.35) / 0.7, 0, 1) - mRoom) * Math.min(1, dt * 4)
+    const env = smooth(0, 0.8, m) * (1 - smooth(4.4, MOVE_LEN, m))
+    mArch = env * (0.08 + 0.2 * mRoom)
+    mRoll = ROLL_MAX * (0.3 + 0.7 * mRoom) * smooth(0.5, 2.1, m) * (1 - smooth(2.7, 4.9, m))
+    mFinSweep = smooth(1.5, 2.6, m) * (1 - smooth(4.0, 4.9, m))
+    mBeat = Math.exp(-(((m - 3.5) / 0.3) ** 2))
+  }
+
+  // the spout, mist and rings, placed for this frame (after the spine is placed)
+  function placeMove(time) {
+    const m = moveT0 < 0 ? -1 : time - moveT0
+    const uw = perWidth()
+    ringPoint(blowRing, blowSec[0], 0, blowP, 0)
+    const mr = mRoom
+    // the screen centre (the group's origin) in rig units: the band is measured from it
+    const yc = (frameY - holder.position.y) / holder.scale.y
+    // apex height above the blowhole, in widths: short and wide on a phone, and never past the header line
+    const blowW = (blowP[1] - yc) / uw
+    // the margin covers the perspective: the crown is nearer the camera than the body's middle, so its
+    // spout reads higher on the screen than its rig height says
+    const H = Math.min(0.08 + 0.62 * mr, Math.max(0.03, 0.8 * (mUp - blowW - 0.2)))
+    const L = 0.7 + 0.35 * (1 - mr) // how far the crown opens sideways, in widths
+    const spread = 0.8 + 0.4 * mr
+    const shardRGB = shards.instanceColor.array
+    const flatZ = 0.35 + 0.65 * mr // the rings and crown flatten on a narrow band
+    // star shards: each leaves the blowhole, opens like a crown and falls back under gravity
+    for (let k = 0; k < SH_N; k += 1) {
+      const birth = SPOUT_T0 + 1.3 * (k / SH_N) + 0.15 * hash(k + 1)
+      const a0 = m - birth
+      const life = 2.3 + 0.6 * hash(k + 2)
+      if (m < 0 || a0 < 0 || a0 > life) {
+        shards.setMatrixAt(k, zeroM)
+        glowCol[k * 3] = 0
+        glowCol[k * 3 + 1] = 0
+        glowCol[k * 3 + 2] = 0
+        continue
+      }
+      const v0 = Math.sqrt(2 * GRAV * H * (0.75 + 0.5 * hash(k + 3))) // widths per second, upward
+      const th = TAU * hash(k + 4)
+      const cLat = L * spread * (0.4 + 0.6 * hash(k + 5))
+      const settle = k < SETTLE_N
+      // a settler stops where it meets the back: the height where its ballistic path meets the skin
+      let a = a0
+      let landed = false
+      if (settle) {
+        ringPoint(setRing[k], setY[k], setZ[k], surf, 0)
+        const hW = (surf[1] - blowP[1]) / uw
+        const disc = v0 * v0 - 2 * GRAV * hW
+        if (disc >= 0) {
+          const aLand = (v0 + Math.sqrt(disc)) / GRAV
+          if (a0 > aLand) {
+            a = aLand
+            landed = true
+          }
+        }
+      }
+      const lat = cLat * (1 - Math.exp(-2.4 * a))
+      const ox = Math.cos(th) * lat
+      const oz = Math.sin(th) * lat * flatZ
+      const oy = v0 * a - 0.5 * GRAV * a * a
+      // a shard that would leave the band (above the header or below the caption) goes out before it does
+      const yw = (blowP[1] + oy * uw - yc) / uw
+      const inside = (1 - smooth(mUp - 0.22, mUp - 0.1, yw)) * (1 - smooth(-mDown + 0.12, -mDown + 0.04, yw))
+      const fade = smooth(0, 0.12, a0) * (1 - smooth(life - 0.7, life, a0)) * inside
+      const glint = landed ? 0.5 + 0.5 * Math.sin(a0 * 13 + k) : 0
+      const base = (0.01 + 0.007 * hash(k + 6)) * uw * (k % 12 === 5 ? 1.25 : 1)
+      const sz = base * fade * (1 + 0.6 * glint)
+      spP.set(blowP[0] + ox * uw, blowP[1] + oy * uw, blowP[2] + oz * uw)
+      spS.setScalar(sz)
+      spQ.setFromAxisAngle(spAxis, th + 2.5 * a0)
+      spM.compose(spP, spQ, spS)
+      shards.setMatrixAt(k, spM)
+      // the glow follows the shard: a warm, bright halo that fades with it
+      const gl = fade * (1 + 0.8 * glint) * (lite ? 0.8 : 1.6)
+      glowPos[k * 3] = spP.x
+      glowPos[k * 3 + 1] = spP.y
+      glowPos[k * 3 + 2] = spP.z
+      glowCol[k * 3] = shardRGB[k * 3] * gl
+      glowCol[k * 3 + 1] = shardRGB[k * 3 + 1] * gl
+      glowCol[k * 3 + 2] = shardRGB[k * 3 + 2] * gl
+    }
+    shards.instanceMatrix.needsUpdate = true
+    glowGeo.attributes.position.needsUpdate = true
+    glowGeo.attributes.color.needsUpdate = true
+    // mist: rises slowly from the base of the spout and spreads, then goes out
+    mistMat.opacity = m < 0 ? 0 : 0.6 * smooth(0.9, 1.5, m) * (1 - smooth(3.2, 4.4, m))
+    for (let k = 0; k < MIST_N; k += 1) {
+      const a = m - (1.0 + 2.2 * hash(k + 20))
+      if (m < 0 || a < 0 || a > 2.6) {
+        mistPos[k * 3] = blowP[0]
+        mistPos[k * 3 + 1] = blowP[1] - 40 // parked far below the frame until it is born
+        mistPos[k * 3 + 2] = blowP[2]
+        continue
+      }
+      const th = TAU * hash(k + 21)
+      const r = (0.05 + 0.3 * a) * spread * (0.4 + 0.6 * hash(k + 22)) * uw
+      const rise = (0.05 + 0.25 * a) * (0.6 + 0.4 * hash(k + 23))
+      const my = (blowP[1] - yc) / uw + rise
+      if (my > mUp - 0.2 || my < -mDown + 0.12) {
+        mistPos[k * 3] = blowP[0]
+        mistPos[k * 3 + 1] = blowP[1] - 40 // out of the band: parked out of the frame
+        mistPos[k * 3 + 2] = blowP[2]
+        continue
+      }
+      mistPos[k * 3] = blowP[0] + Math.cos(th) * r
+      mistPos[k * 3 + 1] = blowP[1] + rise * uw
+      mistPos[k * 3 + 2] = blowP[2] + Math.sin(th) * r * flatZ
+    }
+    mistGeo.attributes.position.needsUpdate = true
+    // rings: one after another as the fountain peaks, thin and slow, fading as they grow
+    for (let i = 0; i < 3; i += 1) {
+      const { mesh, mat } = ringList[i]
+      const a = m - (RING_T0 + 0.45 * i)
+      if (m < 0 || a < 0 || a > RING_LIFE) {
+        mesh.visible = false
+        continue
+      }
+      mesh.visible = true
+      const t = a / RING_LIFE
+      // the band: a ring may not grow its far edge past the room above the crown; on a phone it spreads sideways
+      const capW = Math.max(0.04, (mUp - blowW - 0.12) / 0.6)
+      const R = Math.min(0.1 + 0.42 * a, capW) * spread * uw
+      const sx = 1 + 1.6 * (1 - mr)
+      mesh.position.set(blowP[0], blowP[1] + 0.02 * uw * a, blowP[2])
+      mesh.scale.set(R * sx, 1, R * flatZ)
+      mat.opacity = 0.75 * (1 - t) ** 1.6 * smooth(0, 0.12, t)
+    }
+  }
+  // at rest every shard is a zero matrix, every ring is hidden and the mist has no opacity
+
   // no shadows on anything the creature makes
   group.traverse((child) => {
     if (child.isMesh || child.isPoints || child.isInstancedMesh) {
@@ -902,28 +1296,381 @@ export function createCreature(THREE, { envMap, lite }) {
   holder.position.set(-((minX + maxX) / 2) * fit, -((minY + maxY) / 2) * fit, -centreZ * fit)
   const size = { x: rawX * fit, y: rawY * fit }
 
+  // ---- the rig's pose at a time: pure in time, no springs in here ------------
+  let sculptOn = false
+  let disposed = false
+  function setPose(time, e) {
+    placeSpine(time, e)
+    if (!sculptOn) bodyGeo.computeVertexNormals() // the wrapped sculpt is flat-shaded: no rig normals needed
+    placeFreckles()
+    for (let k = 0; k < CRYSTAL_F.length; k += 1) {
+      mTmp.multiplyMatrices(frames[crystalRing[k]].matrix, crystalLocal[k])
+      crystals.setMatrixAt(k, mTmp)
+    }
+    crystals.instanceMatrix.needsUpdate = true
+    for (let k = 0; k < TUB_N; k += 1) {
+      mTmp.multiplyMatrices(frames[tubRing[k]].matrix, tubLocal[k])
+      tubs.setMatrixAt(k, mTmp)
+    }
+    tubs.instanceMatrix.needsUpdate = true
+    for (let k = 0; k < fins.length; k += 1) fins[k].update(time, e)
+    for (let k = 0; k < flukeUpdates.length; k += 1) flukeUpdates[k](time, e)
+    placeMove(time)
+  }
+
+  // ---- springs: fed by the creature's own motion; clamped, deterministic -------
+  const tailX = new Float64Array(TAIL_NODES)
+  const tailV = new Float64Array(TAIL_NODES)
+  const tailQ = new Float32Array(NR)
+  for (let i = 0; i < NR; i += 1) tailQ[i] = clamp((U[i] - TAIL_FROM) / (1 - TAIL_FROM), 0, 1)
+  function resetSprings() {
+    finX.fill(0)
+    finV.fill(0)
+    flukeX.fill(0)
+    flukeV.fill(0)
+    tailX.fill(0)
+    tailV.fill(0)
+    tailZ.fill(0)
+  }
+  function stepSprings(time, dt, motion) {
+    const vx = clamp(motion ? motion.vx || 0 : 0, -3, 3)
+    const vy = clamp(motion ? motion.vy || 0 : 0, -3, 3)
+    const spin = clamp(motion ? motion.spin || 0 : 0, -8, 8)
+    const h = clamp(dt, 0, 0.05)
+    if (h > 0) {
+      // pectoral fins: lag up and down with the rise and fall, and the turn throws them outward
+      for (let s = 0; s < 2; s += 1) {
+        const side = s === 0 ? 1 : -1
+        stepChain(finX, finV, s * FIN_NODES, FIN_NODES, clamp(0.2 * vy + 0.15 * spin * side, -2, 2), 20, time, h, 0.5, s)
+      }
+      // flukes: the same, flapping with the lift, and the turn pushes one lobe ahead of the other
+      for (let s = 0; s < 2; s += 1) {
+        const sgn = s === 0 ? 1 : -1
+        stepChain(flukeX, flukeV, s * FLUKE_NODES, FLUKE_NODES, clamp(0.15 * vy + 0.12 * spin * sgn, -2, 2), 20, time, h, 0.5, 2 + s)
+      }
+      // tail stock: sways sideways and trails the turn, the tip last
+      stepChain(tailX, tailV, 0, TAIL_NODES, clamp(-0.12 * spin, -2, 2), 12, time, h, 0.25, 4)
+    }
+    for (let i = 0; i < NR; i += 1) tailZ[i] = tailQ[i] > 0 ? 0.8 * nodeAt(tailX, 0, TAIL_NODES, tailQ[i]) : 0
+  }
+
+  // ---- the sculpt: download, pose the rig, wrap, seat the eyes, swap ----------
+  let sculptWrap = null
+  let sculptMesh = null
+  let sculptMat = null
+  let sculptGeo = null
+  let sculptTex = []
+  let sculptStats = null
+  // hands the thread back to the page for a moment, so scrolling and frames are not held up
+  const nextTurn = () => new Promise((resolve) => setTimeout(resolve, 0))
+  const bindSculpt = async () => {
+    const [{ GLTFLoader }, { DRACOLoader }] = await Promise.all([
+      import('three/examples/jsm/loaders/GLTFLoader.js'),
+      import('three/examples/jsm/loaders/DRACOLoader.js'),
+    ])
+    const draco = new DRACOLoader()
+    draco.setDecoderPath('/draco/')
+    const loader = new GLTFLoader()
+    loader.setDRACOLoader(draco)
+    let gltf = null
+    try {
+      gltf = await loader.loadAsync(lite ? MODEL_URL_LITE : MODEL_URL)
+    } finally {
+      // the decoder is freed on every exit, a failed download included
+      draco.dispose()
+    }
+    // one cleanup for every early exit: the loaded scene's geometry, materials and textures
+    const freeScene = () => {
+      gltf.scene.traverse((c) => {
+        c.geometry?.dispose()
+        for (const mt of [].concat(c.material || [])) {
+          for (const key in mt) if (mt[key] && mt[key].isTexture) mt[key].dispose()
+          mt.dispose()
+        }
+      })
+    }
+    if (disposed) {
+      freeScene()
+      return
+    }
+    gltf.scene.updateMatrixWorld(true)
+    let src = null
+    let geo = null
+    gltf.scene.traverse((c) => {
+      if (!c.isMesh || src) return
+      src = c
+      geo = c.geometry.clone()
+      geo.applyMatrix4(c.matrixWorld)
+    })
+    if (!src) throw new Error('whale sculpt has no mesh')
+
+    // the rig at the picture's pose (springs at rest), so the wrap binds to the same shape
+    resetSprings()
+    setPose(PICTURE.t, 0)
+    const wrap = createSculptWrap(THREE, {
+      sculpt: geo,
+      group,
+      yaw: PICTURE.yaw,
+      pitch: PICTURE.pitch,
+      // instanced rig pieces (the tiny crystal shards and tubercles) are not bind sources: a sculpt
+      // vertex that lands near a standing shard is pulled up into a blade, so the sculpt binds to the fins and body only.
+      // the move's spout pieces are not body either
+      exclude: (mesh) => mesh.material === eyeMat || mesh.isInstancedMesh || spoutMeshes.has(mesh),
+      depth: 'auto',
+    })
+    // the fit runs in turns of SLICE_MS, so the page never waits on it for long. The rig is read at the
+    // picture's pose in the first turn, before the rig moves on (the grid is a snapshot of it)
+    const job = wrap.fitSteps()
+    let finished = false
+    let sliceMaxMs = 0
+    let sliceCount = 0
+    while (!finished) {
+      const t0 = performance.now()
+      finished = job.step(SLICE_MS)
+      sliceMaxMs = Math.max(sliceMaxMs, performance.now() - t0)
+      sliceCount += 1
+      if (!finished) {
+        await nextTurn()
+        if (disposed) {
+          wrap.dispose()
+          geo.dispose()
+          freeScene()
+          return
+        }
+      }
+    }
+    const stats = wrap.stats
+    const postT0 = performance.now()
+    // the longest stretch of synchronous work after the fit (the waits between turns are not counted)
+    const probe = (() => {
+      let last = performance.now()
+      let max = 0
+      return {
+        tick() {
+          const now = performance.now()
+          max = Math.max(max, now - last)
+          last = now
+        },
+        reset() {
+          last = performance.now()
+        },
+        get max() {
+          return max
+        },
+      }
+    })()
+
+    // the sculpt's own triangles, as they stand at the picture's pose: the rig is still at rest here
+    const aligned = Float32Array.from(geo.attributes.position.array)
+    wrap.update()
+    const bound = geo.attributes.position.array
+    // a sculpt triangle whose corners were bound to far-apart parts of the rig is torn: its edges grow
+    // many times over. Such triangles are dropped (the vertices stay, so the wrap is unchanged)
+    const keep = []
+    const edgeGrow = (a, b) => {
+      const la = Math.hypot(aligned[3 * a] - aligned[3 * b], aligned[3 * a + 1] - aligned[3 * b + 1], aligned[3 * a + 2] - aligned[3 * b + 2])
+      const lb = Math.hypot(bound[3 * a] - bound[3 * b], bound[3 * a + 1] - bound[3 * b + 1], bound[3 * a + 2] - bound[3 * b + 2])
+      return la > 1e-6 ? lb / la : 1
+    }
+    const srcIdx = geo.index ? geo.index.array : null
+    const triCount = srcIdx ? srcIdx.length / 3 : bound.length / 9
+    let dropped = 0
+    const TRI_CHUNK = 1500 // triangles per turn: the cull is sliced like the fit
+    for (let t0 = 0; t0 < triCount; t0 += TRI_CHUNK) {
+      const t1 = Math.min(triCount, t0 + TRI_CHUNK)
+      for (let t = t0; t < t1; t += 1) {
+        const a = srcIdx ? srcIdx[3 * t] : 3 * t
+        const b = srcIdx ? srcIdx[3 * t + 1] : 3 * t + 1
+        const c = srcIdx ? srcIdx[3 * t + 2] : 3 * t + 2
+        if (Math.max(edgeGrow(a, b), edgeGrow(b, c), edgeGrow(c, a)) > STRETCH_MAX) {
+          dropped += 1
+          continue
+        }
+        keep.push(a, b, c)
+      }
+      probe.tick()
+      if (t1 < triCount) {
+        await nextTurn()
+        probe.reset()
+        if (disposed) {
+          wrap.dispose()
+          geo.dispose()
+          freeScene()
+          return
+        }
+      }
+    }
+    probe.tick()
+    geo.setIndex(keep)
+    probe.tick()
+
+    // the baked hide, the dragon's recipe: flat-shaded, normal map, AO, roughness, clearcoat on desktop
+    const m = src.material
+    const mat = new THREE.MeshPhysicalMaterial({
+      color: m.map ? 0xffffff : 0x1b2a66,
+      map: m.map || null,
+      aoMap: m.aoMap || null,
+      aoMapIntensity: 1,
+      roughnessMap: m.roughnessMap || null,
+      roughness: 1,
+      metalness: 0.05,
+      normalMap: m.normalMap || null,
+      flatShading: true,
+      side: THREE.DoubleSide,
+      envMap,
+      envMapIntensity: lite ? 0.45 : 0.5,
+    })
+    if (m.normalMap) mat.normalScale.copy(m.normalScale)
+    // the baked albedo is near white: the back takes midnight navy, the belly stays pale
+    // (a tint by height on the rig's up axis, so no vertex colours or normals are needed)
+    mat.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying float vBackY;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBackY = position.y;')
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying float vBackY;')
+        .replace(
+          '#include <color_fragment>',
+          `#include <color_fragment>
+  float backT = smoothstep(-0.04, 0.12, vBackY);
+  float lumT = dot(diffuseColor.rgb, vec3(0.333));
+  diffuseColor.rgb = mix(vec3(0.6, 0.68, 0.84), vec3(0.13, 0.18, 0.38), backT) * max(lumT / 0.85, 0.6);`,
+        )
+    }
+    if (!lite) {
+      mat.clearcoat = 0.3
+      mat.clearcoatRoughness = 0.4
+      mat.iridescence = 0.2
+      mat.iridescenceIOR = 1.3
+      mat.iridescenceThicknessRange = [140, 400]
+    }
+    sculptTex = [m.map, m.aoMap, m.roughnessMap, m.normalMap].filter(Boolean)
+
+    // frame the creature on the rig and the sculpt together, so nothing is cut at the edges
+    let sx0 = Infinity
+    let sx1 = -Infinity
+    let sy0 = Infinity
+    let sy1 = -Infinity
+    for (let k = 0; k < keep.length; k += 1) {
+      const v = keep[k]
+      const px = bound[3 * v]
+      const py = bound[3 * v + 1]
+      if (px < sx0) sx0 = px
+      if (px > sx1) sx1 = px
+      if (py < sy0) sy0 = py
+      if (py > sy1) sy1 = py
+    }
+    // the rig's box in group units (the holder maps unit space by fit and its position); the bindings
+    // are kept in group units, so only the group's own scale and position change here
+    const hp = holder.position
+    const ux0 = Math.min(hp.x + fit * minX, sx0)
+    const ux1 = Math.max(hp.x + fit * maxX, sx1)
+    const uy0 = Math.min(hp.y + fit * minY, sy0)
+    const uy1 = Math.max(hp.y + fit * maxY, sy1)
+    const fw = (ux1 - ux0) * 1.05
+    const fh = (uy1 - uy0) * 1.1
+    const kf = 2 / Math.max(fw, fh)
+    frameY = (uy0 + uy1) / 2
+    group.scale.setScalar(kf)
+    group.position.set(-((ux0 + ux1) / 2) * kf, -((uy0 + uy1) / 2) * kf, 0)
+    size.x = fw * kf
+    size.y = fh * kf
+    group.updateMatrixWorld(true)
+
+    // the eyes: seat each one on the nearest sculpt point, and move its geometry there
+    group.updateMatrixWorld(true)
+    const toGroup = new THREE.Matrix4().copy(group.matrixWorld).invert()
+    const pos = geo.attributes.position.array
+    const N = geo.attributes.position.count
+    const eyeFrame = frames[eyeRing]
+    eyeFrame.updateMatrixWorld(true)
+    const toFrame = new THREE.Matrix4().copy(eyeFrame.matrixWorld).invert()
+    const fromGroup = new THREE.Matrix4().copy(group.matrixWorld)
+    const ep = eyeGeo.attributes.position.array
+    for (let side = 0; side < 2; side += 1) {
+      const [ey, ez] = eyeLocal[side]
+      const c = new THREE.Vector3(0, ey, ez).applyMatrix4(eyeFrame.matrixWorld).applyMatrix4(toGroup)
+      let best = 0
+      let bd = Infinity
+      for (let k = 0; k < N; k += 1) {
+        const dx = pos[3 * k] - c.x
+        const dy = pos[3 * k + 1] - c.y
+        const dz = pos[3 * k + 2] - c.z
+        const d = dx * dx + dy * dy + dz * dz
+        if (d < bd) {
+          bd = d
+          best = k
+        }
+      }
+      const t = new THREE.Vector3(pos[3 * best], pos[3 * best + 1], pos[3 * best + 2]).applyMatrix4(fromGroup).applyMatrix4(toFrame)
+      // the eye's own centre is (0, ey, ez) in its frame: shift its vertices by the difference
+      const ox = t.x
+      const oy = t.y - ey
+      const oz = t.z - ez
+      const from = side === 0 ? 0 : eyeSplit
+      const to = side === 0 ? eyeSplit : ep.length / 3
+      for (let v = from; v < to; v += 1) {
+        ep[3 * v] += ox
+        ep[3 * v + 1] += oy
+        ep[3 * v + 2] += oz
+      }
+    }
+    eyeGeo.attributes.position.needsUpdate = true
+    probe.tick()
+
+    // the rig's body is hidden; the glowing eyes and the star freckles stay
+    // the crystals stay: they sit on the spine as rig pieces, the sculpt's own surface carries the rest
+    group.traverse((child) => {
+      if ((child.isMesh || child.isInstancedMesh) && child.material !== eyeMat && child !== crystals && !spoutMeshes.has(child)) {
+        child.visible = false
+      }
+    })
+    sculptMesh = new THREE.Mesh(geo, mat)
+    sculptMesh.frustumCulled = false
+    sculptMesh.castShadow = false
+    sculptMesh.receiveShadow = false
+    group.add(sculptMesh)
+    sculptGeo = geo
+    sculptMat = mat
+    sculptWrap = wrap
+    sculptStats = {
+      ...stats,
+      sliceCount,
+      sliceMaxMs: Number(sliceMaxMs.toFixed(2)),
+      postMaxBlockMs: Number(probe.max.toFixed(2)),
+      postWallMs: Number((performance.now() - postT0).toFixed(2)),
+    }
+    sculptOn = true
+  }
+  const ready = bindSculpt().catch((err) => {
+    console.warn('whale sculpt not shown, the code-built whale stays:', err)
+  })
+
   return {
     group,
     size,
-    update(time, dt, energy) {
+    ready,
+    get sculptStats() {
+      return sculptStats
+    },
+    update(time, dt, energy, motion) {
       const e = clamp(energy, 0, 1)
-      placeSpine(time, e)
-      bodyGeo.computeVertexNormals()
-      placeFreckles()
-      for (let k = 0; k < CRYSTAL_F.length; k += 1) {
-        mTmp.multiplyMatrices(frames[crystalRing[k]].matrix, crystalLocal[k])
-        crystals.setMatrixAt(k, mTmp)
-      }
-      crystals.instanceMatrix.needsUpdate = true
-      for (let k = 0; k < TUB_N; k += 1) {
-        mTmp.multiplyMatrices(frames[tubRing[k]].matrix, tubLocal[k])
-        tubs.setMatrixAt(k, mTmp)
-      }
-      tubs.instanceMatrix.needsUpdate = true
-      for (let k = 0; k < fins.length; k += 1) fins[k].update(time, e)
-      for (let k = 0; k < flukeUpdates.length; k += 1) flukeUpdates[k](time, e)
+      clockNow = time
+      stepSprings(time, dt, motion)
+      updateMove(time, dt, motion)
+      setPose(time, e)
+      if (sculptOn) sculptWrap.update()
+    },
+    // the signature move: starts at the next update, unless one is already playing
+    act() {
+      if (moveT0 < 0) pendingAct = true
     },
     dispose() {
+      disposed = true
+      sculptWrap?.dispose()
+      sculptMesh?.geometry.dispose()
+      sculptMat?.dispose()
+      sculptTex.forEach((t) => t.dispose())
       bodyGeo.dispose()
       skin.dispose()
       finSkin.dispose()
@@ -941,6 +1688,18 @@ export function createCreature(THREE, { envMap, lite }) {
       freckleMat.dispose()
       freckleTex.dispose()
       eyeMat.dispose()
+      shardGeo.dispose()
+      shardMat.dispose()
+      shards.dispose()
+      mistGeo.dispose()
+      mistMat.dispose()
+      mistTex.dispose()
+      ringGeo.dispose()
+      ringTex.dispose()
+      for (const r of ringList) r.mat.dispose()
+      glowGeo.dispose()
+      glowMat.dispose()
+      glowTex.dispose()
       group.traverse((child) => {
         if (child.geometry) child.geometry.dispose()
       })

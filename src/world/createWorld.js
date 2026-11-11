@@ -44,8 +44,22 @@ const makeActor = (name) => ({
   creature: null,
   freeFit: 1,
   energy: 0,
+  // how the actor is moving right now, handed to the creature so its loose parts can lag and swing:
+  // vx, vy in creature widths per second (screen right, up), spin in radians per second about the vertical.
+  // yaw, pitch: how it is turned on screen right now, so a signature move can aim somewhere on the screen.
+  // roomUp, roomDown, roomLeft, roomRight: open space from its centre to the edge of its box (or of the
+  // screen when it flies free), in creature widths. A move must stay inside roomUp and roomDown: beyond
+  // them is the header or the page's copy. Sideways the screen edge simply clips it.
+  // aimYaw, aimPitch: where the page wants a move pointed (screen yaw, and radians above level),
+  // or NaN to let the creature choose from the room it has.
+  motion: { vx: 0, vy: 0, spin: 0, yaw: 0, pitch: 0, roomUp: 1, roomDown: 1, roomLeft: 1, roomRight: 1, aimYaw: NaN, aimPitch: NaN },
+  aim: null,
+  // phones: two planes that cut off anything drawn above or below the creature's band
+  planes: null,
+  guarded: 0,
   lastX: 0,
   lastY: 0,
+  lastYaw: 0,
   dragYaw: 0,
   dragPitch: 0,
   velYaw: 0,
@@ -58,14 +72,17 @@ const makeActor = (name) => ({
  * @param {HTMLCanvasElement} canvas
  * @param {{
  *   lite?: boolean,
+ *   mask?: 0 | 1 | 2,
  *   modelUrl: string,
  *   onProgress?: (ratio: number) => void,
  *   onReady?: () => void,
  *   onError?: (err: unknown) => void,
- * }} options lite = phone build: smaller models, no bloom, cheaper materials
+ * }} options lite = phone build: smaller models, no bloom, cheaper materials.
+ *   mask = dev check (tools/audit_phone.mjs): black sky, no stars, no bloom, a readable canvas;
+ *   1 hides the crystal swarm too, 2 keeps it.
  */
 export function createWorld(canvas, options) {
-  const { lite = false, modelUrl, onProgress = () => {}, onReady = () => {}, onError = () => {} } = options
+  const { lite = false, mask = 0, modelUrl, onProgress = () => {}, onReady = () => {}, onError = () => {} } = options
 
   const actors = { dragon: makeActor('dragon') }
   for (const name of LATER) actors[name] = makeActor(name)
@@ -159,28 +176,39 @@ export function createWorld(canvas, options) {
     let x = pose.x * halfW
     let y = pose.y * halfH
     let fit = actor.freeFit
+    // the open space it may fill: the whole screen, or its box once it rides one
+    let spaceTop = halfH
+    let spaceBottom = -halfH
     const box = actor.box
     if (box && pose.stage > 0.001) {
       let top = box.fixed ? box.top : box.top - window.scrollY
       let height = box.height
       if (box.clipTop !== undefined && top < box.clipTop) {
-        // the box is sliding under the header: the creature keeps to what is left of it
-        height = Math.max(box.minHeight ?? 120, top + height - box.clipTop)
+        // the box is sliding under the header: the creature keeps to what is left of it,
+        // growing smaller with it, and is gone when the box is
+        height = Math.max(0, top + height - box.clipTop)
         top = box.clipTop
       }
+      // the same at the foot of the screen, where the chat button floats
+      if (box.clipBottom !== undefined && top + height > box.clipBottom) height = Math.max(0, box.clipBottom - top)
       const hw = (box.width / viewW) * halfW
       const hh = (height / viewH) * halfH
       // a creature may reach further above its centre than below (raised wings):
       // fit and centre that whole envelope, so nothing pokes out of the top of the box
       const up = creature.reach?.up ?? creature.size.y / 2
       const down = creature.reach?.down ?? creature.size.y / 2
-      const boxFit = Math.min((2 * hw) / creature.size.x, (2 * hh) / (up + down))
+      // a little air inside the box: springs and a turned body reach past the rest silhouette
+      const boxFit = Math.min((2 * hw * 0.96) / creature.size.x, (2 * hh * 0.9) / (up + down))
       const bx = (((box.left + box.width / 2) / viewW) * 2 - 1) * halfW + pose.x * hw
       const by =
         (1 - ((top + height / 2) / viewH) * 2) * halfH + pose.y * hh - ((up - down) / 2) * boxFit * pose.scale
       x += (bx - x) * pose.stage
       y += (by - y) * pose.stage
       fit += (boxFit - fit) * pose.stage
+      if (pose.stage > 0.5) {
+        spaceTop = (1 - (top / viewH) * 2) * halfH
+        spaceBottom = (1 - ((top + height) / viewH) * 2) * halfH
+      }
     }
 
     if (!actor.dragging) {
@@ -198,6 +226,13 @@ export function createWorld(canvas, options) {
     }
 
     const s = fit * pose.scale
+    if (s < 1e-4) {
+      rig.visible = false
+      return
+    }
+    // phones: whatever the creature does, nothing of it is drawn outside its band
+    const fenced = Boolean(box && box.guard && pose.stage > 0.5)
+    setGuard(actor, fenced ? spaceTop : Infinity, fenced ? spaceBottom : -Infinity)
     rig.position.set(x, y, 0)
     rig.scale.setScalar(s)
     rig.rotation.set(
@@ -208,11 +243,30 @@ export function createWorld(canvas, options) {
 
     // how hard it is flying: screen speed, quick to rise and slow to settle
     const speed = dt > 0 ? Math.hypot(x - actor.lastX, y - actor.lastY) / halfH / dt : 0
-    actor.lastX = x
-    actor.lastY = y
     const want = Math.min(1, speed * 0.8)
     actor.energy += (want - actor.energy) * (1 - Math.exp(-(want > actor.energy ? 5 : 1.5) * dt))
-    creature.update(time, dt, actor.energy)
+    // its own velocity and turn rate, in its own size, lightly smoothed: what the springs inside it feel
+    if (dt > 0) {
+      const width = Math.max(1e-6, s * creature.size.x)
+      const blend = 1 - Math.exp(-14 * dt)
+      const motion = actor.motion
+      motion.vx += ((x - actor.lastX) / width / dt - motion.vx) * blend
+      motion.vy += ((y - actor.lastY) / width / dt - motion.vy) * blend
+      motion.spin += ((rig.rotation.y - actor.lastYaw) / dt - motion.spin) * blend
+    }
+    actor.lastX = x
+    actor.lastY = y
+    actor.lastYaw = rig.rotation.y
+    actor.motion.yaw = rig.rotation.y
+    actor.motion.pitch = rig.rotation.x
+    const width = Math.max(1e-6, s * creature.size.x)
+    actor.motion.roomUp = Math.max(0, (Math.min(spaceTop, halfH) - y) / width)
+    actor.motion.roomDown = Math.max(0, (y - Math.max(spaceBottom, -halfH)) / width)
+    actor.motion.roomLeft = Math.max(0, (x + halfW) / width)
+    actor.motion.roomRight = Math.max(0, (halfW - x) / width)
+    actor.motion.aimYaw = actor.aim ? actor.aim.yaw : NaN
+    actor.motion.aimPitch = actor.aim ? actor.aim.pitch : NaN
+    creature.update(time, dt, actor.energy, actor.motion)
 
     if (actor === actors.dragon) {
       lights.group.position.copy(rig.position)
@@ -222,6 +276,47 @@ export function createWorld(canvas, options) {
         lights.fitShadow(s)
       }
     }
+  }
+
+  /**
+   * Fence a creature between two screen lines (world y on the page plane). Each plane
+   * runs through the camera and its line, so the cut is exact on screen at any depth.
+   * Infinity lifts the fence.
+   */
+  const setGuard = (actor, topY, bottomY) => {
+    const [above, below] = actor.planes
+    if (topY === Infinity) {
+      above.normal.set(0, -1, 0)
+      above.constant = 1e6
+      below.normal.set(0, 1, 0)
+      below.constant = 1e6
+    } else {
+      let n = Math.hypot(CAMERA_Z, topY)
+      above.normal.set(0, -CAMERA_Z / n, -topY / n)
+      above.constant = (topY * CAMERA_Z) / n
+      n = Math.hypot(CAMERA_Z, bottomY)
+      below.normal.set(0, CAMERA_Z / n, bottomY / n)
+      below.constant = (-bottomY * CAMERA_Z) / n
+    }
+    // a creature may add or swap materials after it is first shown (a model that loads late)
+    actor.guarded -= 1
+    if (actor.guarded > 0) return
+    actor.guarded = 30
+    fencing = actor.planes
+    actor.creature.group.traverse(fence)
+  }
+  let fencing = null
+  const fence = (child) => {
+    const material = child.material
+    if (!material) return
+    if (Array.isArray(material)) material.forEach(fenceOne)
+    else fenceOne(material)
+  }
+  const fenceOne = (material) => {
+    if (material.clippingPlanes === fencing) return
+    material.clippingPlanes = fencing
+    if (material.isShaderMaterial) material.clipping = true
+    material.needsUpdate = true
   }
 
   const tick = (time, deltaMs) => {
@@ -268,7 +363,8 @@ export function createWorld(canvas, options) {
 
   /**
    * Let an element act as a creature's handle: drag spins it, a flick keeps it
-   * turning, double-click snaps it back. Vertical touch scroll passes through.
+   * turning, double-click snaps it back, and a plain tap makes it perform its
+   * signature move. Vertical touch scroll passes through.
    * @param {HTMLElement} el
    * @param {string} [name] which actor
    * @returns {() => void} unbind
@@ -280,6 +376,9 @@ export function createWorld(canvas, options) {
     let lastX = 0
     let lastY = 0
     let lastT = 0
+    let downX = 0
+    let downY = 0
+    let downT = 0
 
     const down = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return
@@ -288,6 +387,9 @@ export function createWorld(canvas, options) {
       lastX = e.clientX
       lastY = e.clientY
       lastT = e.timeStamp
+      downX = e.clientX
+      downY = e.clientY
+      downT = e.timeStamp
       actor.velYaw = 0
       actor.velPitch = 0
       el.setPointerCapture?.(e.pointerId)
@@ -312,6 +414,9 @@ export function createWorld(canvas, options) {
       pointerId = null
       actor.lastDragTime = clock
       el.classList.remove('is-grabbing')
+      // a press that went nowhere is a tap: the creature performs
+      const tap = e.type === 'pointerup' && e.timeStamp - downT < 450 && Math.hypot(e.clientX - downX, e.clientY - downY) < 8
+      if (tap && actor.pose.show > 0) actor.creature?.act?.()
     }
     const reset = () => {
       actor.velYaw = 0
@@ -524,7 +629,7 @@ export function createWorld(canvas, options) {
     }
     swarm.instanceMatrix.needsUpdate = true
 
-    sigil.visible = sigilShow.k > 0.001
+    sigil.visible = sigilShow.k > 0.001 && mask !== 1
     if (sigil.visible) {
       sigil.position.set(ax, ay, az)
       sigil.scale.setScalar(reach * 0.17 * sigilShow.k)
@@ -556,6 +661,8 @@ export function createWorld(canvas, options) {
     scene.add(rig)
     actor.creature = creature
     actor.rig = rig
+    actor.planes = [new THREE.Plane(), new THREE.Plane()]
+    setGuard(actor, Infinity, -Infinity)
     fitFree(actor)
   }
 
@@ -618,11 +725,13 @@ export function createWorld(canvas, options) {
       renderer = new THREE.WebGLRenderer({
         canvas,
         antialias: lite, // the bloom chain brings its own multisampled target
+        preserveDrawingBuffer: mask > 0,
         powerPreference: 'high-performance',
       })
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lite ? 1.5 : 1.75))
       renderer.shadowMap.enabled = true
       renderer.shadowMap.type = THREE.PCFSoftShadowMap
+      renderer.localClippingEnabled = true // the phone guard (setGuard)
       renderer.toneMapping = THREE.ACESFilmicToneMapping
       renderer.toneMappingExposure = 0.96
 
@@ -645,7 +754,12 @@ export function createWorld(canvas, options) {
       enlist(actors.dragon, dragon)
 
       buildSwarm()
-      if (!lite) await buildBloom()
+      if (mask) {
+        scene.background = new THREE.Color(0x000000)
+        starGroup.visible = false
+        swarm.visible = mask === 2
+      }
+      if (!lite && !mask) await buildBloom()
       if (disposed) return
 
       measure()
@@ -677,12 +791,23 @@ export function createWorld(canvas, options) {
     /**
      * Give an actor a box on the page to ride while its pose.stage is above 0.
      * @param {string} name
-     * @param {{ left: number, top: number, width: number, height: number, fixed?: boolean, clipTop?: number, minHeight?: number }} box
+     * @param {{ left: number, top: number, width: number, height: number, fixed?: boolean, clipTop?: number, clipBottom?: number, guard?: boolean }} box
      *   px. top is measured from the top of the document, or of the screen when fixed is set.
-     *   clipTop: the creature stays below this screen line as the box scrolls up under it.
+     *   clipTop, clipBottom: the creature stays between these screen lines as the box scrolls
+     *   past them, shrinking with what is left of the box.
+     *   guard: also cut off anything the creature draws above or below the box (phones, where
+     *   the header sits above the box and the copy below it).
      */
     setBox(name, box) {
       if (actors[name]) actors[name].box = box
+    },
+    /**
+     * Where a creature should point its signature move, or null to let it choose.
+     * @param {string} name
+     * @param {{ yaw: number, pitch: number } | null} aim screen yaw (+ = toward screen right) and radians above level
+     */
+    setAim(name, aim) {
+      if (actors[name]) actors[name].aim = aim
     },
     /** @param {number} progress 0..1 down the page  @param {number} velocity -1..1, sign = direction */
     setScroll(progress, velocity) {
@@ -716,6 +841,11 @@ export function createWorld(canvas, options) {
     /** Stop rendering while nothing of the layer can be seen. */
     setVisible(on) {
       visible = on
+    },
+    /** Ask a creature for its signature move (the dragon's fire, and so on). Ignored while it is off stage or mid-move. */
+    act(name) {
+      const actor = actors[name]
+      if (ready && visible && actor?.pose.show > 0) actor.creature?.act?.()
     },
   }
 }

@@ -724,6 +724,8 @@ main:focus {
   font-size: clamp(2.2rem, 11vw, 8.6rem);
   line-height: 0.98;
   letter-spacing: -0.05em;
+  /* unseen on the night sky; keeps the name readable while the dragon's fire passes behind it */
+  text-shadow: 0 2px 28px rgba(7, 10, 18, 0.6);
 }
 
 .hero__name,

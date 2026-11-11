@@ -5,14 +5,20 @@
 // the form, a webbed dorsal crest, a ribbed tail fan, and a sculpted head (rounded
 // skull, brow ridges, cheek bones, nostril bumps, a hinged jaw with teeth, horns,
 // spines, webbed cheek frills, whiskers) with small HDR gold eyes.
-// Update: a wave runs from behind the head to the tail, the head and the coil
-// hold, the crest and fan flutter a beat behind the body, the whiskers trail.
-// Normals of the body, crest and fan are refreshed on every call.
+// Look: flat-shaded like the dragon (the shader derives each facet, so the body needs no normals),
+// with a seeded jitter on the ring vertices so the facets are irregular, and a pearl-jade palette.
+// Update: a wave runs from behind the head to the tail, the head and the coil hold, the crest,
+// fan, frills and whiskers ride springs that whip on a kick.
+// Signature move, act(): PEARL TIDE (about 4 s). The coil gathers and the head draws back, then
+// it strikes and exhales a spiralling ribbon of pearls and droplets that sweep round the coil,
+// fall as slow rain and fade, with ripples where the stream broke and a soft mist (sprites).
+// Every offset is scaled by the room the page gives (roomUp, roomDown), so nothing crosses the band.
 
 export function createCreature(THREE, { envMap, lite }) {
   const TAU = Math.PI * 2
-  const N = lite ? 84 : 128 // body rings, tail tip (0) to neck (N-1)
-  const SEG = lite ? 14 : 22 // body segments around
+  const N = lite ? 140 : 200 // body rings, tail tip (0) to neck (N-1)
+  const SEG = lite ? 24 : 48 // body segments around
+  const ROOM_PAD = 0.12 // the model's width is padded by this much for room (matches the size slack)
   const SV = SEG + 1 // the seam column is duplicated so the uv can run 0..1
   // head, horns, frills, barbels and eyes use the same counts in both builds so the bounds agree
   const HSEG = 24
@@ -30,7 +36,7 @@ export function createCreature(THREE, { envMap, lite }) {
   const JADE = [0.03, 0.28, 0.22]
   const TEAL = [0.03, 0.2, 0.26]
   const INDIGO = [0.06, 0.07, 0.24]
-  const PALE = [0.5, 0.72, 0.6]
+  const PALE = [0.66, 0.8, 0.74]
   const GOLD = [1.0, 0.56, 0.12]
   const HORN = [0.95, 0.46, 0.1]
   const HSCALE = 1.16 // the head is drawn a little larger than the first pass
@@ -203,7 +209,7 @@ export function createCreature(THREE, { envMap, lite }) {
     const at = (x, y) => hgt[((y + S) % S) * S + ((x + S) % S)]
     const nData = new Uint8Array(S * S * 4)
     const cData = new Uint8Array(S * S * 4)
-    const K = (10 * S) / 512
+    const K = (14 * S) / 512 // stronger scale relief
     for (let y = 0; y < S; y++) {
       for (let x = 0; x < S; x++) {
         const dhx = ((at(x + 1, y) - at(x - 1, y)) * 0.5) * K
@@ -267,8 +273,11 @@ export function createCreature(THREE, { envMap, lite }) {
       const ca = Math.cos(a)
       const sa = Math.sin(a)
       bRing[v] = i
-      bLc[v] = ca * R[i]
-      bDc[v] = sa * R[i] * (sa < 0 ? 0.94 : 1.0)
+      // seeded jitter per (ring, segment): the seam column reuses its segment's value so it stays closed
+      const jk = j % SEG
+      const jit = 1 + 0.018 * (hash(i * 0.731 + jk * 1.913 + 3.3) * 2 - 1)
+      bLc[v] = ca * R[i] * jit
+      bDc[v] = sa * R[i] * jit * (sa < 0 ? 0.94 : 1.0)
       // jade and teal back, indigo tail, pale belly plates
       const base = u < 0.5 ? mix(INDIGO, TEAL, smooth(0, 0.5, u)) : mix(TEAL, JADE, smooth(0.5, 1, u))
       const belly = smooth(-0.3, -0.85, sa) * (1 - smooth(0.85, 0.97, u))
@@ -336,7 +345,7 @@ export function createCreature(THREE, { envMap, lite }) {
     }
     // one spine every third ring; the membrane between them bows out to about 30 percent of the spine height
     const wave3 = 0.5 + 0.5 * Math.cos((TAU * i) / 3)
-    const shape = 0.3 + 0.7 * wave3 * wave3
+    const shape = 0.45 + 0.55 * wave3 // softer spine rhythm: no sawtooth on the inner curve
     const baseCol = mix(INDIGO, TEAL, smooth(0.1, 0.5, u))
     const b = fRing.length
     fRing.push(i)
@@ -563,34 +572,7 @@ export function createCreature(THREE, { envMap, lite }) {
     curveTube(HEAD, [0.08, 0.18, 0.06 * s], [-0.02, 0.25, 0.09 * s], [-0.16, 0.27, 0.11 * s], 5, 0.02, 0.003, () => HORN)
   }
 
-  // cheek frills: four ribs per side with webbing between them
-  for (const s of [1, -1]) {
-    const B = [0.0, -0.02, 0.13 * s]
-    const tips = [
-      [-0.3, 0.15, 0.26 * s],
-      [-0.38, 0.05, 0.34 * s],
-      [-0.36, -0.05, 0.33 * s],
-      [-0.26, -0.13, 0.24 * s],
-    ]
-    for (const tp of tips) {
-      const mid = [(B[0] + tp[0]) / 2, (B[1] + tp[1]) / 2 + 0.02, (B[2] + tp[2]) / 2]
-      curveTube(HEAD, B, mid, tp, 4, 0.013, 0.005, (q, k) => (k === 0 ? JADE : GOLD))
-    }
-    for (let k = 0; k < tips.length - 1; k++) {
-      const tk = tips[k]
-      const tk1 = tips[k + 1]
-      const M = [
-        (tk[0] + tk1[0]) * 0.5 * 0.75 + B[0] * 0.25,
-        (tk[1] + tk1[1]) * 0.5 * 0.75 + B[1] * 0.25,
-        (tk[2] + tk1[2]) * 0.5 * 0.75 + B[2] * 0.25,
-      ]
-      const a = vert(HEAD, B[0], B[1], B[2], JADE)
-      const b = vert(HEAD, tk[0], tk[1], tk[2], GOLD)
-      const c = vert(HEAD, tk1[0], tk1[1], tk1[2], GOLD)
-      const m = vert(HEAD, M[0], M[1], M[2], mix(JADE, GOLD, 0.35))
-      HEAD.i.push(a, b, m, b, c, m, c, a, m)
-    }
-  }
+  // cheek frills: built in their own dynamic buffer (see the frill block after the barbels)
 
   // nostril bumps on the snout (skin colour, with a dark nostril)
   for (const s of [1, -1]) {
@@ -646,7 +628,7 @@ export function createCreature(THREE, { envMap, lite }) {
     const start = b * (BK + 1) * BSEG
     for (let j = 0; j <= BK; j++) {
       const s = j / BK
-      const bc = mix([0.9, 0.5, 0.12], WHISK_TIP, smooth(0.2, 1.0, s))
+      const bc = mix([0.42, 0.78, 0.66], WHISK_TIP, smooth(0.2, 1.0, s))
       for (let k = 0; k < BSEG; k++) {
         const idx = (start + j * BSEG + k) * 3
         barbelCol[idx] = bc[0]
@@ -670,6 +652,86 @@ export function createCreature(THREE, { envMap, lite }) {
   barbelGeo.setAttribute('color', new THREE.BufferAttribute(barbelCol, 3))
   barbelGeo.setAttribute('normal', new THREE.BufferAttribute(barbelNrm, 3))
   barbelGeo.setIndex(barbelIdx)
+
+  // ---- cheek frills: webbed ribs, built in unscaled head space and scaled on write, so the tips
+  // can ride springs. Each rib is a tube round a bowed curve from the cheek to its tip (4 rings,
+  // 8 sides, two caps; ring frames fixed at rest). The webs are the triangles between neighbouring tips.
+  const FRILL_K = 4
+  const COS_TS = Array.from({ length: TS }, (_, j) => Math.cos((j / TS) * TAU))
+  const SIN_TS = Array.from({ length: TS }, (_, j) => Math.sin((j / TS) * TAU))
+  const frillRibs = []
+  const frillWebs = []
+  const frPos = []
+  const frCol = []
+  const frIdx = []
+  const frv = (p, col) => {
+    frPos.push(p[0], p[1], p[2])
+    frCol.push(col[0], col[1], col[2])
+    return frPos.length / 3 - 1
+  }
+  for (const side of [1, -1]) {
+    const B = [0.0, -0.02, 0.13 * side]
+    const tips = [
+      [-0.3, 0.15, 0.26 * side],
+      [-0.38, 0.05, 0.34 * side],
+      [-0.36, -0.05, 0.33 * side],
+      [-0.26, -0.13, 0.24 * side],
+    ]
+    const ribStart = frillRibs.length
+    for (const tp of tips) {
+      const mid = [(B[0] + tp[0]) / 2, (B[1] + tp[1]) / 2 + 0.02, (B[2] + tp[2]) / 2]
+      const rings = []
+      for (let k = 0; k < FRILL_K; k += 1) {
+        const t = k / (FRILL_K - 1)
+        const fr = frameOf(bezTan(B, mid, tp, t))
+        rings.push({ L: fr.L, D: fr.D, r: 0.013 + (0.005 - 0.013) * t })
+      }
+      const base = frPos.length / 3
+      for (let k = 0; k < FRILL_K; k += 1) {
+        for (let j = 0; j < TS; j += 1) frv([0, 0, 0], k === 0 ? JADE : GOLD)
+      }
+      const cap0 = frv([0, 0, 0], JADE)
+      const cap1 = frv([0, 0, 0], GOLD)
+      for (let k = 0; k < FRILL_K - 1; k += 1) {
+        for (let j = 0; j < TS; j += 1) {
+          const a = base + k * TS + j
+          const b = base + k * TS + ((j + 1) % TS)
+          const c = a + TS
+          const d = b + TS
+          frIdx.push(a, c, b, b, c, d)
+        }
+      }
+      for (let j = 0; j < TS; j += 1) {
+        frIdx.push(cap0, base + j, base + ((j + 1) % TS))
+        const a1 = base + (FRILL_K - 1) * TS + j
+        const b1 = base + (FRILL_K - 1) * TS + ((j + 1) % TS)
+        frIdx.push(cap1, b1, a1)
+      }
+      frillRibs.push({ side, B, tip: tp, base, rings, cap0, cap1 })
+    }
+    for (let k = 0; k < tips.length - 1; k += 1) {
+      const a = frv(B, JADE)
+      const b = frv(tips[k], GOLD)
+      const c = frv(tips[k + 1], GOLD)
+      const m = frv(B, mix(JADE, GOLD, 0.35))
+      frIdx.push(a, b, m, b, c, m, c, a, m)
+      frillWebs.push({ r: ribStart + k, B, a, b, c, m })
+    }
+  }
+  const FRILL_N = frillRibs.length
+  const frillTip = new Float64Array(FRILL_N * 3)
+  const frillPos = Float32Array.from(frPos)
+  const frillGeo = new THREE.BufferGeometry()
+  frillGeo.setAttribute('position', new THREE.BufferAttribute(frillPos, 3).setUsage(THREE.DynamicDrawUsage))
+  frillGeo.setAttribute('color', new THREE.Float32BufferAttribute(frCol, 3))
+  frillGeo.setAttribute('normal', new THREE.Float32BufferAttribute(new Float32Array(frPos.length), 3))
+  frillGeo.setIndex(frIdx)
+  // write one head-space point (unscaled) into a scaled position array
+  const put = (arr, o, x, y, z) => {
+    arr[o] = x * HSCALE
+    arr[o + 1] = y * HSCALE
+    arr[o + 2] = z * HSCALE
+  }
 
   const toGeo = (A) => {
     const g = new THREE.BufferGeometry()
@@ -702,14 +764,17 @@ export function createCreature(THREE, { envMap, lite }) {
     vertexColors: true,
     map: colorTex,
     normalMap: normalTex,
-    normalScale: new THREE.Vector2(0.9, 0.9),
-    roughness: 0.46,
+    normalScale: new THREE.Vector2(1.8, 1.8),
+    flatShading: true, // the dragon's facets: the shader derives each face normal
+    roughness: 0.5,
     metalness: 0.05,
     envMap,
     envMapIntensity: 0.55,
-    clearcoat: lite ? 0 : 0.4,
-    clearcoatRoughness: 0.3,
-    iridescence: lite ? 0 : 0.2,
+    clearcoat: lite ? 0 : 0.38,
+    clearcoatRoughness: 0.42,
+    iridescence: lite ? 0 : 0.42,
+    iridescenceIOR: 1.32,
+    iridescenceThicknessRange: [140, 420],
     side: THREE.DoubleSide,
   })
   bodyMat.onBeforeCompile = rimPatch
@@ -742,12 +807,13 @@ export function createCreature(THREE, { envMap, lite }) {
   jawPivot.add(jawMesh)
   const eyeMesh = new THREE.Mesh(eyeGeo, eyeMat)
   const barbelMesh = new THREE.Mesh(barbelGeo, finMat)
-  for (const m of [bodyMesh, finMesh, tailMesh, headMesh, jawMesh, eyeMesh, barbelMesh]) {
+  const frillMesh = new THREE.Mesh(frillGeo, bodyMat)
+  for (const m of [bodyMesh, finMesh, tailMesh, headMesh, jawMesh, eyeMesh, barbelMesh, frillMesh]) {
     m.castShadow = false
     m.receiveShadow = false
     m.frustumCulled = false
   }
-  headNod.add(headMesh, eyeMesh, barbelMesh, jawPivot)
+  headNod.add(headMesh, eyeMesh, barbelMesh, jawPivot, frillMesh)
   headRoot.add(headNod)
   group.add(bodyMesh, finMesh, tailMesh, headRoot)
 
@@ -760,11 +826,283 @@ export function createCreature(THREE, { envMap, lite }) {
   let eS = 0
   const THICK = 0.012
 
-  const update = (time, dt, energy) => {
+  // ---- loose parts on springs. Each chain is a row of damped springs. A spring is pushed by the
+  // creature's own acceleration (so the parts lag behind a shove or a turn and settle), a little idle
+  // drive keeps them alive, and every offset is clamped so nothing folds or drifts.
+  // Offsets are in creature widths; W (the model's width, set after the bounds) turns them into model units.
+  let W = 1
+  const STILL = { vx: 0, vy: 0, spin: 0 }
+  const TAIL_U = [0, 0.07, 0.14, 0.22] // ascending along the body from the tip; node 3 sits on the body
+  const CREST_U = [0.1, 0.35, 0.6, 0.85]
+  const tailX = new Float64Array(4)
+  const tailY = new Float64Array(4)
+  const tailVX = new Float64Array(4)
+  const tailVY = new Float64Array(4)
+  const crX = new Float64Array(4)
+  const crY = new Float64Array(4)
+  const crVX = new Float64Array(4)
+  const crVY = new Float64Array(4)
+  const fanX = new Float64Array(1)
+  const fanV = new Float64Array(1)
+  const frX = new Float64Array(FRILL_N)
+  const frY = new Float64Array(FRILL_N)
+  const frVX = new Float64Array(FRILL_N)
+  const frVY = new Float64Array(FRILL_N)
+  const wX = new Float64Array(BAR.length * BK)
+  const wV = new Float64Array(BAR.length * BK)
+  const FX = new Float64Array(16)
+  const FY = new Float64Array(16)
+  const CRX = new Float32Array(N)
+  const CRY = new Float32Array(N)
+  let accX = 0
+  let accY = 0
+  let lastVX = 0
+  let lastVY = 0
+
+  const clampTo = (x, lim) => (x > lim ? lim : x < -lim ? -lim : x)
+  // value of a chain (ascending knots us) at u, no allocation
+  const chainAt = (arr, us, u) => {
+    const n = arr.length
+    if (u <= us[0]) return arr[0]
+    for (let k = 1; k < n; k += 1) {
+      if (u <= us[k]) return arr[k - 1] + ((arr[k] - arr[k - 1]) * (u - us[k - 1])) / (us[k] - us[k - 1])
+    }
+    return arr[n - 1]
+  }
+  // semi-implicit Euler in sub-steps of at most 12.5 ms; stable for any dt up to 0.05
+  const springStep = (x, v, F, K, D, lim, dt) => {
+    const sub = Math.ceil(dt / 0.0125)
+    const h = dt / sub
+    for (let s = 0; s < sub; s += 1) {
+      for (let i = 0; i < x.length; i += 1) {
+        v[i] += (F[i] - K * x[i] - D * v[i]) * h
+        x[i] += v[i] * h
+        if (x[i] > lim) {
+          x[i] = lim
+          v[i] = 0
+        } else if (x[i] < -lim) {
+          x[i] = -lim
+          v[i] = 0
+        }
+      }
+    }
+  }
+  const resetPhysics = () => {
+    for (const a of [tailX, tailY, tailVX, tailVY, crX, crY, crVX, crVY, fanX, fanV, frX, frY, frVX, frVY, wX, wV]) a.fill(0)
+    accX = 0
+    accY = 0
+    lastVX = 0
+    lastVY = 0
+  }
+  const stepPhysics = (time, dt, motion) => {
+    const vx = clampTo(motion.vx || 0, 3)
+    const vy = clampTo(motion.vy || 0, 3)
+    const spin = clampTo(motion.spin || 0, 8)
+    const kx = clampTo((vx - lastVX) / dt, 20)
+    const ky = clampTo((vy - lastVY) / dt, 20)
+    lastVX = vx
+    lastVY = vy
+    const blend = Math.min(1, dt * 10)
+    accX += (kx - accX) * blend
+    accY += (ky - accY) * blend
+    // tail: the tip (node 0) lags most, the node on the body least
+    for (let k = 0; k < 4; k += 1) {
+      const g = 0.08 * (1 + 0.6 * (3 - k))
+      FX[k] = -accX * g - spin * 0.1 * (4 - k)
+      FY[k] = -accY * g * 0.8 + 0.5 * Math.sin(time * 1.7 + k * 1.3) + kick * 0.9 * Math.sin(time * 9 - k * 0.8)
+    }
+    springStep(tailX, tailVX, FX, 25, 2.5, 0.16, dt)
+    springStep(tailY, tailVY, FY, 25, 2.5, 0.16, dt)
+    // fan flutter (one spring)
+    FX[0] = -accY * 0.02 - spin * 0.03 + 0.25 * Math.sin(time * 2.2) + kick * 0.7 * Math.sin(time * 8)
+    springStep(fanX, fanV, FX, 20, 3, 0.35, dt)
+    // crest: further along the body, more lag
+    for (let k = 0; k < 4; k += 1) {
+      const g = 0.1 + 0.1 * k
+      FX[k] = -accX * g - spin * 0.04 * (k + 1)
+      FY[k] = -accY * g * 0.8 + 0.4 * Math.sin(time * 2.9 + k * 1.1)
+    }
+    springStep(crX, crVX, FX, 30, 3, 0.2, dt)
+    springStep(crY, crVY, FY, 30, 3, 0.2, dt)
+    // cheek frill tips: outer tips lag most
+    for (let r = 0; r < FRILL_N; r += 1) {
+      const g = 0.05 + 0.04 * (r & 3)
+      FX[r] = -accX * g
+      FY[r] = -accY * g * 0.8 + 0.3 * Math.sin(time * 2.1 + r * 0.9) + kick * 0.6 * Math.sin(time * 7 + r)
+    }
+    springStep(frX, frVX, FX, 40, 6, 0.12, dt)
+    springStep(frY, frVY, FY, 40, 6, 0.12, dt)
+    // whiskers: a chain per whisker, each joint pulled by the one before it
+    for (let b = 0; b < BAR.length; b += 1) {
+      for (let j = 1; j <= BK; j += 1) {
+        const idx = b * BK + j - 1
+        const s = j / BK
+        const prev = j > 1 ? wX[idx - 1] : 0
+        FX[idx] =
+          -accX * 0.15 * s - spin * 0.05 * s + 1.5 * Math.sin(time * 2.3 + b * 1.9 + j * 0.8) * s + kick * 2.0 * Math.sin(time * 11 + idx) * s + 30 * (prev - wX[idx])
+      }
+    }
+    springStep(wX, wV, FX, 50, 5, 0.2, dt)
+  }
+
+  // ---- PEARL TIDE: the signature move. Everything is made once here and only moved in update.
+  const MOVE_T = 4.2
+  const PN = lite ? 36 : 110 // pearls and droplets in the pool
+  const MIST_N = lite ? 3 : 5
+  const RIP_N = 3
+  const hdr = lite ? 1 : 1.5 // HDR tint on desktop (blooms above 1.3), clamped in lite
+  const mouthRest = headWorld(0.6 * HSCALE, -0.03 * HSCALE, 0)
+  const pearlGeo = new THREE.IcosahedronGeometry(1, 1)
+  const pearlMat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })
+  const pearls = new THREE.InstancedMesh(pearlGeo, pearlMat, PN)
+  pearls.frustumCulled = false
+  pearls.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+  const pSpawn = new Float32Array(PN)
+  const pLife = new Float32Array(PN)
+  const pPhi = new Float32Array(PN)
+  const pSize = new Float32Array(PN)
+  const pSpeed = new Float32Array(PN)
+  const tints = [
+    [0.55, 1.0, 0.86], // pale jade
+    [0.82, 0.94, 1.0], // ice white
+    [1.0, 0.8, 0.4], // a little gold
+  ]
+  const tmpCol = new THREE.Color()
+  for (let k = 0; k < PN; k += 1) {
+    const h1 = hash(k * 1.73 + 0.31)
+    const h2 = hash(k * 2.9 + 4.1)
+    const h3 = hash(k * 0.61 + 9.7)
+    pSpawn[k] = 1.0 + 1.4 * (k / PN) + 0.12 * h1
+    pLife[k] = 1.2 + 0.5 * h2
+    pPhi[k] = k * 2.39996 + h1 * 0.6
+    pSize[k] = 0.012 + 0.012 * h3
+    pSpeed[k] = 0.85 + 0.3 * h2
+    const tn = tints[k % 3]
+    tmpCol.setRGB(tn[0] * hdr, tn[1] * hdr, tn[2] * hdr)
+    pearls.setColorAt(k, tmpCol)
+  }
+  pearls.instanceColor.needsUpdate = true
+  group.add(pearls)
+  const dummy = new THREE.Object3D()
+
+  const mistCanvas = document.createElement('canvas')
+  mistCanvas.width = 64
+  mistCanvas.height = 64
+  const mctx = mistCanvas.getContext('2d')
+  const mg = mctx.createRadialGradient(32, 32, 0, 32, 32, 32)
+  mg.addColorStop(0, 'rgba(255,255,255,1)')
+  mg.addColorStop(0.45, 'rgba(255,255,255,0.35)')
+  mg.addColorStop(1, 'rgba(255,255,255,0)')
+  mctx.fillStyle = mg
+  mctx.fillRect(0, 0, 64, 64)
+  const mistTex = new THREE.CanvasTexture(mistCanvas)
+  mistTex.colorSpace = THREE.SRGBColorSpace
+  const mists = []
+  for (let i = 0; i < MIST_N; i += 1) {
+    const sp = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: mistTex,
+        color: new THREE.Color(0.5, 0.95, 0.85),
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        opacity: 0,
+      }),
+    )
+    sp.frustumCulled = false
+    group.add(sp)
+    mists.push(sp)
+  }
+  const ringGeo = new THREE.RingGeometry(0.8, 1, 48)
+  const rings = []
+  for (let j = 0; j < RIP_N; j += 1) {
+    const rm = new THREE.Mesh(
+      ringGeo,
+      new THREE.MeshBasicMaterial({
+        color: new THREE.Color(0.6 * hdr, 1.0 * hdr, 0.9 * hdr),
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        opacity: 0,
+        side: THREE.DoubleSide,
+      }),
+    )
+    rm.frustumCulled = false
+    group.add(rm)
+    rings.push(rm)
+  }
+
+  let moveT = -1 // seconds into the move, -1 when idle
+  let kick = 0 // whip force on the springs while the move runs
+  let hf = 0 // head offset forward (model units) while the move runs
+  let hu = 0 // head offset up
+  // every pearl's place: a spiralling ribbon out of the mouth, a slow sweep round the coil, then rain
+  const placePearls = (t, lift, WR, floorY, ceilY) => {
+    const mx = mouthRest[0] + Fv.x * hf + Uv.x * hu
+    const my = mouthRest[1] + Fv.y * hf + Uv.y * hu
+    const mz = mouthRest[2] + Fv.z * hf + Uv.z * hu
+    for (let k = 0; k < PN; k += 1) {
+      const age = t - pSpawn[k]
+      let sc = 0
+      let px = 0
+      let py = 0
+      let pz = 0
+      if (age > 0 && age < pLife[k]) {
+        const fade = Math.min(1, (pLife[k] - age) * 3)
+        const s = (pSpeed[k] * WR * 1.3 * (1 - Math.exp(-2.2 * age))) / 2.2
+        const fallT = Math.max(0, age - 1.0)
+        const drop = 0.22 * WR * fallT * fallT
+        const rad = (0.04 + 0.16 * Math.min(age, 1.2)) * WR * lift
+        const th = pPhi[k] + 7.0 * age
+        const sweep = 0.35 * WR * lift * Math.sin(1.6 * age + pPhi[k] * 0.3) * Math.min(1, age * 1.5)
+        const side = sweep + rad * Math.cos(th)
+        const upo = rad * Math.sin(th)
+        px = mx + Fv.x * s + Sv.x * side + Uv.x * upo
+        py = my + Fv.y * s + Sv.y * side + Uv.y * upo - drop
+        pz = mz + Fv.z * s + Sv.z * side + Uv.z * upo
+        // inside the band: a pearl fades as it nears the floor or the ceiling
+        const edge = clamp01((py - floorY) / (0.2 * WR)) * clamp01((ceilY - py) / (0.1 * WR))
+        sc = pSize[k] * WR * fade * edge
+      }
+      dummy.position.set(px, py, pz)
+      dummy.scale.setScalar(sc)
+      dummy.updateMatrix()
+      pearls.setMatrixAt(k, dummy.matrix)
+    }
+    pearls.instanceMatrix.needsUpdate = true
+  }
+
+  const act = () => {
+    if (moveT >= 0) return // already playing: never restart it
+    moveT = 0
+  }
+
+  const update = (time, dt, energy, motion = STILL) => {
     eS += (energy - eS) * Math.min(1, dt * 4)
+    const ru = motion.roomUp ?? 1
+    const rd = motion.roomDown ?? 1
+    // room squeezes the move: on a phone the head lifts less and the rain falls a shorter way
+    const lift = 0.25 + 0.75 * clamp01((ru - 0.25) / 0.5)
+    const WR = W + ROOM_PAD
+    if (moveT >= 0) {
+      moveT += dt
+      if (moveT >= MOVE_T) moveT = -1
+    }
+    let g1 = 0 // gather: the coil tightens and the head draws back
+    let s1 = 0 // strike and exhale
+    let mist = 0
+    if (moveT >= 0) {
+      g1 = smooth(0, 0.9, moveT) * (1 - smooth(1.4, 1.9, moveT))
+      s1 = smooth(1.0, 1.35, moveT) * (1 - smooth(2.2, 3.0, moveT))
+      mist = smooth(0.5, 1.2, moveT) * (1 - smooth(3.4, 4.2, moveT))
+    }
+    kick = s1 * 0.8 + g1 * 0.15
+    hf = lift * WR * (-0.05 * g1 + 0.08 * s1)
+    hu = lift * WR * (0.045 * g1 - 0.02 * s1)
+    if (dt > 0) stepPhysics(time, dt, motion)
     const e = eS
     const omega = 2.0 + 3.0 * e
-    const amp = 0.9 + 0.5 * e
+    const amp = (0.9 + 0.5 * e) * (1 + 0.5 * s1 + 0.2 * g1)
     // spine: wave from behind the head to the tail, head stays still
     for (let i = 0; i < N; i++) {
       const u = U[i]
@@ -781,6 +1119,20 @@ export function createCreature(THREE, { envMap, lite }) {
       CX[i] = C0[k3] + D0[k3] * disp + L0[k3] * lat + T0[k3] * stretch
       CY[i] = C0[k3 + 1] + D0[k3 + 1] * disp + L0[k3 + 1] * lat + T0[k3 + 1] * stretch
       CZ[i] = C0[k3 + 2] + D0[k3 + 2] * disp + L0[k3 + 2] * lat + T0[k3 + 2] * stretch
+      // the coil gathers toward its middle while the move winds up (the neck stays on the head)
+      const tight = lift * 0.07 * g1 * smooth(0.9, 0.7, u)
+      CX[i] += (mcx - C0[k3]) * tight
+      CY[i] += (mcy - C0[k3 + 1]) * tight
+      CZ[i] += (mcz - C0[k3 + 2]) * tight
+      // tail springs: the offset fades out toward the body; the crest reads its own springs
+      const tw = smooth(0.34, 0.2, u) * W
+      const ox = tw * chainAt(tailX, TAIL_U, u)
+      const oy = tw * chainAt(tailY, TAIL_U, u)
+      CX[i] += L0[k3] * ox + D0[k3] * oy
+      CY[i] += L0[k3 + 1] * ox + D0[k3 + 1] * oy
+      CZ[i] += L0[k3 + 2] * ox + D0[k3 + 2] * oy
+      CRX[i] = chainAt(crX, CREST_U, u) * W
+      CRY[i] = chainAt(crY, CREST_U, u) * W
     }
     // body
     for (let v = 0; v < BV; v++) {
@@ -795,23 +1147,6 @@ export function createCreature(THREE, { envMap, lite }) {
       bodyPos[v3 + 2] = CZ[i] + L0[k3 + 2] * lc + D0[k3 + 2] * dc
     }
     bodyGeo.attributes.position.needsUpdate = true
-    bodyGeo.computeVertexNormals()
-    // average the normals across the duplicated seam so it does not show
-    {
-      const nrm = bodyGeo.attributes.normal.array
-      for (let i = 0; i < N; i++) {
-        const a = i * SV * 3
-        const b = (i * SV + SEG) * 3
-        const x = nrm[a] + nrm[b]
-        const y = nrm[a + 1] + nrm[b + 1]
-        const z = nrm[a + 2] + nrm[b + 2]
-        const l = Math.hypot(x, y, z) || 1
-        nrm[a] = nrm[b] = x / l
-        nrm[a + 1] = nrm[b + 1] = y / l
-        nrm[a + 2] = nrm[b + 2] = z / l
-      }
-      bodyGeo.attributes.normal.needsUpdate = true
-    }
 
     // dorsal crest: flutters a beat behind the body
     const fp = finGeo.attributes.position.array
@@ -819,8 +1154,8 @@ export function createCreature(THREE, { envMap, lite }) {
       const i = fRing[v]
       const k3 = i * 3
       const g = G[i]
-      const lc = fLc[v] * g
-      const dc = fDc[v] * g + fFw[v] * FL[i]
+      const lc = fLc[v] * g + fFw[v] * CRX[i]
+      const dc = fDc[v] * g + fFw[v] * (FL[i] + CRY[i])
       const v3 = v * 3
       fp[v3] = CX[i] + L0[k3] * lc + D0[k3] * dc
       fp[v3 + 1] = CY[i] + L0[k3 + 1] * lc + D0[k3 + 1] * dc
@@ -832,6 +1167,7 @@ export function createCreature(THREE, { envMap, lite }) {
     // tail fan: spokes sweep around the tail tip and ripple
     const tp = tailGeo.attributes.position.array
     const t2 = 2 * 3
+    const fanK = 1 + fanX[0]
     const cxp = CX[2]
     const cyp = CY[2]
     const czp = CZ[2]
@@ -853,7 +1189,7 @@ export function createCreature(THREE, { envMap, lite }) {
         const ribP = ribPhase * ribPhase * ribPhase * ribPhase
         const scal = 0.9 + 0.1 * Math.cos((TAU * m) / FRIB)
         const wob = 1 + 0.1 * Math.sin(time * 2.6 - m * 0.22) * (0.4 + e)
-        const lenE = lenBase * (0.7 + 0.3 * ca) * scal * wob
+        const lenE = lenBase * (0.7 + 0.3 * ca) * scal * wob * fanK
         const exX = -T0[t2] * ca + sideX * sa
         const exY = -T0[t2 + 1] * ca + sideY * sa
         const exZ = -T0[t2 + 2] * ca + sideZ * sa
@@ -880,8 +1216,13 @@ export function createCreature(THREE, { envMap, lite }) {
     tailGeo.computeVertexNormals()
 
     // head: almost still, a slow breath and nod
-    headNod.rotation.set(0.025 * Math.sin(time * 0.6) * (1 + e), 0.035 * Math.sin(time * 0.45), 0.02 * Math.sin(time * 0.7))
-    jawPivot.rotation.z = -(0.1 + 0.03 * Math.sin(time * 0.9) + 0.12 * e)
+    headNod.rotation.set(
+      0.025 * Math.sin(time * 0.6) * (1 + e),
+      0.035 * Math.sin(time * 0.45),
+      0.02 * Math.sin(time * 0.7) + lift * (0.2 * g1 - 0.12 * s1),
+    )
+    jawPivot.rotation.z = -(0.1 + 0.03 * Math.sin(time * 0.9) + 0.12 * e + 0.3 * s1) // the jaw opens on the exhale
+    headRoot.position.set(Pe[0] + Fv.x * hf + Uv.x * hu, Pe[1] + Fv.y * hf + Uv.y * hu, Pe[2] + Fv.z * hf + Uv.z * hu)
 
     // whiskers: a beat behind, the sway grows toward the tips
     const sway = 0.05 + 0.06 * e
@@ -892,7 +1233,7 @@ export function createCreature(THREE, { envMap, lite }) {
       for (let j = 0; j <= BK; j++) {
         const s = j / BK
         const rad = 0.024 * (1 - 0.6 * s) + 0.003
-        const sw = sway * s * s * Math.sin(2.6 * (time - 0.2) - 2.0 * s + b * 0.7)
+        const sw = sway * s * s * Math.sin(2.6 * (time - 0.2) - 2.0 * s + b * 0.7) + (j > 0 ? wX[b * BK + j - 1] * W : 0)
         const cxw = root[0] + bb.d[0] * len * s + bb.Lb[0] * sw
         const cyw = root[1] + bb.d[1] * len * s + bb.Lb[1] * sw
         const czw = root[2] + bb.d[2] * len * s + bb.Lb[2] * sw
@@ -915,6 +1256,92 @@ export function createCreature(THREE, { envMap, lite }) {
     }
     barbelGeo.attributes.position.needsUpdate = true
     barbelGeo.attributes.normal.needsUpdate = true
+
+    // cheek frills: each tip rides its spring; the rib curves and the webs follow
+    const fr = frillGeo.attributes.position.array
+    for (let r = 0; r < FRILL_N; r += 1) {
+      const rib = frillRibs[r]
+      const B = rib.B
+      const tx = rib.tip[0]
+      const ty = rib.tip[1] + frY[r] * W
+      const tz = rib.tip[2] + frX[r] * W * rib.side
+      frillTip[r * 3] = tx
+      frillTip[r * 3 + 1] = ty
+      frillTip[r * 3 + 2] = tz
+      const mx = (B[0] + tx) / 2
+      const my = (B[1] + ty) / 2 + 0.02
+      const mz = (B[2] + tz) / 2
+      for (let k = 0; k < FRILL_K; k += 1) {
+        const t = k / (FRILL_K - 1)
+        const o = 1 - t
+        const w1 = o * o
+        const w2 = 2 * o * t
+        const w3 = t * t
+        const cx = w1 * B[0] + w2 * mx + w3 * tx
+        const cy = w1 * B[1] + w2 * my + w3 * ty
+        const cz = w1 * B[2] + w2 * mz + w3 * tz
+        const ring = rib.rings[k]
+        for (let j = 0; j < TS; j += 1) {
+          const ca = COS_TS[j] * ring.r
+          const sa = SIN_TS[j] * ring.r
+          put(fr, (rib.base + k * TS + j) * 3, cx + ring.L[0] * ca + ring.D[0] * sa, cy + ring.L[1] * ca + ring.D[1] * sa, cz + ring.L[2] * ca + ring.D[2] * sa)
+        }
+        if (k === 0) put(fr, rib.cap0 * 3, cx, cy, cz)
+        if (k === FRILL_K - 1) put(fr, rib.cap1 * 3, cx, cy, cz)
+      }
+    }
+    for (const web of frillWebs) {
+      const B = web.B
+      const i0 = web.r * 3
+      const i1 = (web.r + 1) * 3
+      const t0 = frillTip[i0]
+      const t1 = frillTip[i0 + 1]
+      const t2 = frillTip[i0 + 2]
+      const u0 = frillTip[i1]
+      const u1 = frillTip[i1 + 1]
+      const u2 = frillTip[i1 + 2]
+      put(fr, web.a * 3, B[0], B[1], B[2])
+      put(fr, web.b * 3, t0, t1, t2)
+      put(fr, web.c * 3, u0, u1, u2)
+      put(fr, web.m * 3, (t0 + u0) * 0.375 + B[0] * 0.25, (t1 + u1) * 0.375 + B[1] * 0.25, (t2 + u2) * 0.375 + B[2] * 0.25)
+    }
+    frillGeo.attributes.position.needsUpdate = true
+    frillGeo.computeVertexNormals()
+
+    // the move's effects: pearls and droplets, ripples where the stream breaks, and the mist
+    const floorY = -rd * WR * 0.92
+    const ceilY = ru * WR * 0.92
+    placePearls(moveT, lift, WR, floorY, ceilY) // moveT is -1 when idle: every pearl is hidden
+    for (let j = 0; j < RIP_N; j += 1) {
+      const rip = rings[j]
+      const rt = moveT - (2.1 + 0.4 * j)
+      const life = 1.2
+      if (rt > 0 && rt < life) {
+        const q = rt / life
+        const along = (0.45 + 0.2 * j) * WR * (0.5 + 0.5 * lift)
+        rip.position.set(
+          mouthRest[0] + Fv.x * (hf + along),
+          mouthRest[1] + Fv.y * (hf + along) - 0.05 * WR * lift,
+          mouthRest[2] + Fv.z * (hf + along),
+        )
+        rip.scale.setScalar(WR * (0.05 + 0.2 * q))
+        rip.material.opacity = 0.5 * (1 - q)
+      } else {
+        rip.material.opacity = 0
+      }
+    }
+    const st = smooth(3.0, 4.2, moveT) // the settle: the mist drifts round the coil's middle
+    for (let i = 0; i < MIST_N; i += 1) {
+      const sp = mists[i]
+      const along = (0.25 + 0.22 * i) * WR * (0.4 + 0.6 * lift)
+      const ph = i * 1.7
+      const sx = mouthRest[0] + Fv.x * (hf + along) + Uv.x * 0.12 * WR * Math.sin(moveT * 1.3 + ph)
+      const sy = mouthRest[1] + Fv.y * (hf + along) + Uv.y * 0.12 * WR * Math.sin(moveT * 1.3 + ph)
+      const sz = mouthRest[2] + Fv.z * (hf + along) + Uv.z * 0.12 * WR * Math.sin(moveT * 1.3 + ph)
+      sp.position.set(sx + (mcx - sx) * st, sy + (mcy - sy) * st, sz + (mcz - sz) * st)
+      sp.scale.setScalar(WR * (0.36 + 0.06 * i) * (1 + 0.3 * st))
+      sp.material.opacity = 0.11 * mist * (1 - 0.4 * i / MIST_N)
+    }
   }
 
   // ---- silhouette bounds at rest, for size and centring
@@ -945,12 +1372,17 @@ export function createCreature(THREE, { envMap, lite }) {
     const w = headWorld(HEAD.p[v * 3], HEAD.p[v * 3 + 1], HEAD.p[v * 3 + 2])
     grow(w[0], w[1])
   }
+  for (let v = 0; v < frillPos.length / 3; v++) {
+    const w = headWorld(frillPos[v * 3], frillPos[v * 3 + 1], frillPos[v * 3 + 2])
+    grow(w[0], w[1])
+  }
   for (let v = 0; v < barbelPos.length / 3; v++) {
     const w = headWorld(barbelPos[v * 3], barbelPos[v * 3 + 1], barbelPos[v * 3 + 2])
     grow(w[0], w[1])
   }
   const w = maxX - minX
   const h = maxY - minY
+  W = w
   // room for the wave, the whiskers and the fan's flutter; tighter than the first pass so the coil fills the frame
   const SLACK_X = 0.12
   const SLACK_Y = 0.28
@@ -960,13 +1392,25 @@ export function createCreature(THREE, { envMap, lite }) {
   group.scale.setScalar(s)
   group.position.set(-cxB * s, -cyB * s, 0)
   const size = { x: (w + SLACK_X) * s, y: (h + SLACK_Y) * s }
+  // how far the rest silhouette reaches from the centre; the move stays inside the room the page gives
+  const reach = { up: (maxY - cyB) * s + 0.1 * (w + SLACK_X) * s, down: (cyB - minY) * s + 0.25 * (w + SLACK_X) * s }
 
   const dispose = () => {
-    for (const g of [bodyGeo, finGeo, tailGeo, headGeo, jawGeo, eyeGeo, barbelGeo]) g.dispose()
-    for (const m of [bodyMat, finMat, eyeMat]) m.dispose()
+    for (const g of [bodyGeo, finGeo, tailGeo, headGeo, jawGeo, eyeGeo, barbelGeo, frillGeo, pearlGeo, ringGeo]) g.dispose()
+    for (const m of [bodyMat, finMat, eyeMat, pearlMat]) m.dispose()
+    for (const r of rings) r.material.dispose()
+    for (const sp of mists) sp.material.dispose()
+    mistTex.dispose()
     normalTex.dispose()
     colorTex.dispose()
   }
 
-  return { group, size, update, dispose }
+  return {
+    group,
+    size,
+    reach,
+    update,
+    act,
+    dispose,
+  }
 }
