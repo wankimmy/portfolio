@@ -13,9 +13,6 @@
       <span>Safwan Hakim</span>
     </a>
 
-    <!-- where you are: the pause-menu name of the chapter on screen -->
-    <p class="nav__chapter" aria-hidden="true">{{ current.menu }}</p>
-
     <button
       ref="toggleRef"
       type="button"
@@ -77,7 +74,7 @@
 </template>
 
 <script setup>
-import { computed, inject, nextTick, onUnmounted, ref } from 'vue'
+import { inject, nextTick, onUnmounted, ref } from 'vue'
 import gsap from 'gsap'
 
 import { chapters, EMAIL, profile, WHATSAPP } from '../content.js'
@@ -92,7 +89,6 @@ const menuRef = ref(null)
 const toggleRef = ref(null)
 let tween = null
 
-const current = computed(() => chapters.find((c) => c.id === props.active) ?? chapters[0])
 const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 const show = async () => {

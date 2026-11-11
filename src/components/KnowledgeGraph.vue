@@ -3,25 +3,47 @@
     <div class="wrap star-map__header">
       <header class="section__head section__head--center">
         <p class="label">Star map</p>
-        <h2 class="h2" data-split>Every skill, quest, and tool, mapped as constellations.</h2>
+        <h2 class="h2" data-split>Every skill, quest, and tool, mapped like a brain.</h2>
       </header>
 
       <div class="star-map__legend" data-reveal>
-        <span
+        <button
           v-for="d in domains"
           :key="d.key"
+          type="button"
           class="star-map__legend-item"
-          :style="{ '--domain-color': domainsByKey[d.key]?.color }"
+          :class="{ 'is-active': focusedLobe === d.key }"
+          :style="{ '--domain-color': d.color }"
+          :aria-pressed="focusedLobe === d.key"
+          @click="toggleLobe(d.key)"
         >
           <i aria-hidden="true"></i>
-          {{ domainsByKey[d.key]?.label }}
-        </span>
+          {{ d.label }}
+        </button>
       </div>
+      <p class="star-map__hint">Tap a part of the brain, or a colour above, to zoom in.</p>
     </div>
 
     <div class="star-map__stage">
       <div ref="graphRef" class="star-map__canvas">
         <canvas ref="canvasRef"></canvas>
+
+        <div class="star-map__regions">
+          <button
+            v-for="d in domains"
+            :key="d.key"
+            :ref="(el) => setRegionRef(d.key, el)"
+            type="button"
+            class="star-map__region"
+            :class="{ 'is-active': focusedLobe === d.key }"
+            :style="{ '--domain-color': d.color }"
+            :aria-label="`Zoom into the ${d.region}: ${d.label}`"
+            @click.stop="toggleLobe(d.key)"
+          >
+            <span class="star-map__region-name">{{ d.region }}</span>
+            <span class="star-map__region-domain">{{ d.label }}</span>
+          </button>
+        </div>
 
         <div class="star-map__labels" aria-hidden="true">
           <span
@@ -44,7 +66,26 @@
         </div>
       </div>
 
+      <aside v-if="lobe && !focused" class="star-map__panel" :style="{ '--domain-color': lobe.color }">
+        <button type="button" class="star-map__panel-close" aria-label="Close region panel" @click="clearFocus">
+          &times;
+        </button>
+        <p class="star-map__panel-kicker">{{ lobe.label }}</p>
+        <h3 class="star-map__panel-title">{{ lobe.region }}</h3>
+        <p class="star-map__panel-usage">{{ lobe.blurb }}</p>
+        <ul class="star-map__chips">
+          <li v-for="n in lobeNodes" :key="n.id">
+            <button type="button" class="star-map__chip" @click="focusById(n.id)">
+              {{ n.name }} <span>Lv {{ n.level }}</span>
+            </button>
+          </li>
+        </ul>
+      </aside>
+
       <aside v-if="focused" ref="panelRef" class="star-map__panel">
+        <button v-if="focusedLobe" type="button" class="star-map__panel-back" @click="focusLobe(focusedLobe)">
+          &larr; {{ domainsByKey[focusedLobe]?.region }}
+        </button>
         <button type="button" class="star-map__panel-close" aria-label="Close node panel" @click="clearFocus">
           &times;
         </button>
@@ -77,7 +118,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
-import { createGraphForce } from '../lib/graphForce.js'
+import { BRAIN, createGraphForce, REGIONS } from '../lib/graphForce.js'
 import { domains, edges, nodes } from '../lib/knowledgeData.js'
 
 const domainsByKey = Object.fromEntries(domains.map((d) => [d.key, d]))
@@ -90,7 +131,18 @@ const panelRef = ref(null)
 
 const hovered = ref(null)
 const focused = ref(null)
+const focusedLobe = ref(null) // the brain region zoomed into, if any
+const lobe = computed(() => (focusedLobe.value ? domainsByKey[focusedLobe.value] : null))
+const lobeNodes = computed(() =>
+  focusedLobe.value ? nodes.filter((n) => n.domain === focusedLobe.value).sort((a, b) => b.level - a.level) : [],
+)
 const tooltipPos = ref({ x: 0, y: 0 })
+
+const regionEls = {}
+const setRegionRef = (key, el) => {
+  if (el) regionEls[key] = el
+  else delete regionEls[key]
+}
 
 const labelEls = {}
 const setLabelRef = (id, el) => {
@@ -106,6 +158,8 @@ let nodeMeshes = []
 let edgeLine = null
 let edgePosAttr = null
 let edgeColAttr = null
+let shell = null // the brain outline: a point cloud of folds
+let swayT = 0
 let raycaster = null
 let pointer = null
 let graphGroup = null
@@ -186,7 +240,7 @@ function applyZoom(immediate = true) {
 
 function setZoomFactor(next, { apply = true } = {}) {
   zoomFactor = clampZoom(next)
-  if (apply && !focused.value) applyZoom(true)
+  if (apply && !focused.value && !focusedLobe.value) applyZoom(true)
 }
 
 const neighborNames = computed(() => {
@@ -216,7 +270,7 @@ function syncRendererSize() {
   camera.aspect = w / h
   camera.updateProjectionMatrix()
   renderer.setSize(w, h, false)
-  if (nodeMeshes.length && !focused.value) {
+  if (nodeMeshes.length && !focused.value && !focusedLobe.value) {
     // Resize re-frames the full brain and resets zoom
     fitCameraToGraph(true, { resetZoom: true })
   }
@@ -228,6 +282,7 @@ function fitCameraToGraph(applyImmediately = true, { resetZoom: doResetZoom = fa
 
   const box = new THREE.Box3()
   nodeMeshes.forEach((m) => box.expandByObject(m))
+  if (shell) box.expandByObject(shell)
   if (box.isEmpty()) return
 
   const size = new THREE.Vector3()
@@ -235,20 +290,21 @@ function fitCameraToGraph(applyImmediately = true, { resetZoom: doResetZoom = fa
   box.getSize(size)
   box.getCenter(center)
 
-  const maxDim = Math.max(size.x, size.y, size.z, 1)
+  // the brain is seen side-on: its depth does not take frame room
+  const maxDim = Math.max(size.x, size.y, 1)
   const fovRad = (camera.fov * Math.PI) / 180
-  const fitHeightDist = maxDim / (2 * Math.tan(fovRad / 2))
-  const fitWidthDist = fitHeightDist / Math.max(camera.aspect, 0.01)
+  const fitHeightDist = size.y / (2 * Math.tan(fovRad / 2)) + size.z / 2
+  const fitWidthDist = size.x / (2 * Math.tan(fovRad / 2)) / Math.max(camera.aspect, 0.01) + size.z / 2
   // Tight framing so the brain fills the canvas by default (no scroll-zoom)
   const pad = isNarrowViewport() ? 1.08 : 0.98
   const dist = Math.max(fitHeightDist, fitWidthDist) * pad
 
   homeLookAt = { x: center.x, y: center.y, z: center.z }
-  // Isometric view so the lobe ring reads as a brain, not a stick
+  // side view, a little from above: the brain's profile, face to the left
   homeCam = {
-    x: center.x + maxDim * 0.55,
-    y: center.y + maxDim * 0.42,
-    z: center.z + dist * 0.9,
+    x: center.x,
+    y: center.y + maxDim * 0.12,
+    z: center.z + dist,
   }
   updateHomeDist()
   if (doResetZoom) zoomFactor = 1
@@ -297,7 +353,7 @@ function initGraph(THREEModule) {
   force = createGraphForce(nodes, edges, domains, { seed: 42 })
   maxDegree = Math.max(1, ...Object.values(force.degree))
 
-  // Settle from lobe seeds — do not crush toward origin
+  // Settle from lobe seeds - do not crush toward origin
   force.settle(reduceMotion ? 720 : 560)
 
   const sharedGeo = new THREE.SphereGeometry(1, 16, 14)
@@ -350,11 +406,14 @@ function initGraph(THREEModule) {
   })
   edgeLine = new THREE.LineSegments(edgeGeo, edgeMat)
   graphGroup.add(edgeLine)
+  shell = buildShell(isNarrowViewport() ? 4200 : 9000)
+  graphGroup.add(shell)
   writeEdges(null)
   applyHoverDim(null)
   fitCameraToGraph(true, { resetZoom: true })
 
   raycaster = new THREE.Raycaster()
+  raycaster.params.Points.threshold = 0.3 // a click near the outline counts as on it
   pointer = new THREE.Vector2()
 
   clock = new THREE.Clock()
@@ -373,11 +432,14 @@ function initGraph(THREEModule) {
     })
     writeEdges(hovered.value?.id ?? focused.value?.id ?? null)
 
+    // a slow sway about the side view (never a full turn, so the brain's profile keeps reading)
     if (!reduceMotion && autoRotate && !dragState && !orbitState) {
-      graphGroup.rotation.y += dt * 0.06
+      swayT += dt
+      graphGroup.rotation.y += 0.5 * 0.22 * Math.cos(swayT * 0.22) * dt
     }
 
     projectLabels()
+    projectRegions()
     renderer.render(scene, camera)
   }
   animate()
@@ -405,7 +467,10 @@ function writeEdges(highlightId) {
     pos[i6 + 5] = link.b.z * SCALE
 
     let bright = 0.6
-    if (highlightId) {
+    if (!highlightId && focusedLobe.value) {
+      const key = focusedLobe.value
+      bright = link.a.domain === key && link.b.domain === key ? 0.95 : link.a.domain === key || link.b.domain === key ? 0.35 : 0.04
+    } else if (highlightId) {
       const connected =
         link.a.id === highlightId ||
         link.b.id === highlightId
@@ -434,7 +499,11 @@ function applyHoverDim(hitId) {
     const isNeighbor = neighborSet.has(id)
     let opacity = 0.95
     let scale = m.userData.baseRadius
-    if (hitId) {
+    if (!hitId && focusedLobe.value) {
+      const inLobe = m.userData.node.domain === focusedLobe.value
+      opacity = inLobe ? 1 : 0.1
+      scale = m.userData.baseRadius * (inLobe ? 1.15 : 1)
+    } else if (hitId) {
       if (isHit) {
         opacity = 1
         scale = m.userData.baseRadius * 1.35
@@ -453,8 +522,11 @@ function applyHoverDim(hitId) {
       const deg = force?.degree[id] ?? 0
       const showByDefault = deg >= 4 || (force?.byId[id]?.size ?? 0) >= 3
       let op = '0'
-      if (!hitId) {
-        op = showByDefault ? '0.75' : '0'
+      const inLobe = focusedLobe.value && m.userData.node.domain === focusedLobe.value
+      if (!hitId && focusedLobe.value) {
+        op = inLobe ? '1' : '0'
+      } else if (!hitId) {
+        op = showByDefault && !isNarrowViewport() ? '0.75' : '0'
       } else if (isHit || isNeighbor) {
         op = '1'
       } else {
@@ -485,6 +557,223 @@ function projectLabels() {
     const target = Number(el.dataset.opacity ?? '0')
     el.style.opacity = behind ? '0' : String(target)
   })
+}
+
+function projectRegions() {
+  if (!camera || !graphRef.value || !graphGroup) return
+  const rect = graphRef.value.getBoundingClientRect()
+  const v = new THREE.Vector3()
+  for (const d of domains) {
+    const el = regionEls[d.key]
+    const at = REGIONS[d.key]?.at
+    if (!el || !at) continue
+    v.set(at[0] * SCALE, at[1] * SCALE, at[2] * SCALE)
+    graphGroup.localToWorld(v)
+    v.project(camera)
+    const x = (v.x * 0.5 + 0.5) * rect.width
+    const y = (-v.y * 0.5 + 0.5) * rect.height
+    el.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`
+    // tags step back while one region or one skill is open
+    const show = !focused.value && (!focusedLobe.value || focusedLobe.value === d.key) && v.z < 1
+    el.style.opacity = show ? (focusedLobe.value ? '0' : '1') : '0'
+    el.style.pointerEvents = show && !focusedLobe.value ? 'auto' : 'none'
+  }
+}
+
+/** Nearest region (by its centre) for a point inside the cerebrum, for the outline's tint. */
+function regionAt(x, y, z) {
+  let best = null
+  let bestD = Infinity
+  for (const d of domains) {
+    const R = REGIONS[d.key]
+    if (!R || R.part !== 'cerebrum') continue
+    const dd = (x - R.at[0]) ** 2 + (y - R.at[1]) ** 2 + 0.2 * (z - R.at[2]) ** 2
+    if (dd < bestD) {
+      bestD = dd
+      best = d.key
+    }
+  }
+  return best
+}
+
+/**
+ * The brain's outline as points on its surface, kept only along winding ridges so they read as
+ * folds (gyri), with the gap between the hemispheres, the cerebellum's fine stripes and the stem.
+ * Deterministic: the same brain every load.
+ */
+function buildShell(count) {
+  let t = 1234567
+  const rnd = () => {
+    t += 0x6d2b79f5
+    let r = Math.imul(t ^ (t >>> 15), 1 | t)
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r)
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296
+  }
+  const pos = []
+  const col = []
+  const push = (x, y, z, key, k) => {
+    pos.push(x * SCALE, y * SCALE, z * SCALE)
+    const c = domainRgb[key] ?? [0.7, 0.75, 0.85]
+    col.push(c[0] * k, c[1] * k, c[2] * k)
+    pointKeys.push(key)
+  }
+  const pointKeys = []
+  const C = BRAIN.cerebrum
+  const B = BRAIN.cerebellum
+  const S = BRAIN.stem
+  const want = { cerebrum: count * 0.78, cerebellum: count * 0.15, stem: count * 0.07 }
+  let tries = 0
+  let n = 0
+  while (n < want.cerebrum && tries < count * 40) {
+    tries += 1
+    // a direction on the unit sphere
+    const uz = rnd() * 2 - 1
+    const a = rnd() * Math.PI * 2
+    const rr = Math.sqrt(1 - uz * uz)
+    const ux = rr * Math.cos(a)
+    const uy = rr * Math.sin(a)
+    if (uy < -0.75) continue // the underside stays open
+    // winding ridges: a folded pattern of sines on the direction
+    const f = Math.sin(9 * ux + 3.2 * Math.sin(4 * uy + 1.7 * uz) + 2.1 * Math.sin(5 * uz))
+    const g = Math.sin(8 * uy + 2.6 * Math.sin(5 * ux - 2 * uz))
+    if (Math.abs(f * 0.65 + g * 0.35) > 0.32) continue
+    let s1 = 1 + 0.03 * (f + g)
+    // the longitudinal fissure: a groove down the middle of the top
+    const midline = Math.abs(uz)
+    if (midline < 0.1 && uy > -0.2) {
+      if (midline < 0.035) continue
+      s1 *= 0.93
+    }
+    const x = C.c[0] + ux * C.r[0] * s1
+    const y = C.c[1] + uy * C.r[1] * s1 * (uy < 0 ? 0.88 : 1)
+    const z = C.c[2] + uz * C.r[2] * s1
+    push(x, y, z, regionAt(x, y, z), 0.7 + 0.3 * rnd())
+    n += 1
+  }
+  n = 0
+  tries = 0
+  while (n < want.cerebellum && tries < count * 40) {
+    tries += 1
+    const uz = rnd() * 2 - 1
+    const a = rnd() * Math.PI * 2
+    const rr = Math.sqrt(1 - uz * uz)
+    const ux = rr * Math.cos(a)
+    const uy = rr * Math.sin(a)
+    if (Math.sin(uy * 24 + 0.6 * Math.sin(ux * 6)) < 0.35) continue // the folia: fine horizontal stripes
+    push(B.c[0] + ux * B.r[0], B.c[1] + uy * B.r[1], B.c[2] + uz * B.r[2], 'iot', 0.7 + 0.3 * rnd())
+    n += 1
+  }
+  for (let i = 0; i < want.stem; i += 1) {
+    const a = rnd() * Math.PI * 2
+    const y = S.y0 + rnd() * (S.y1 - S.y0)
+    // the stem narrows as it runs down
+    const rad = S.rad * (0.85 + 0.25 * ((y - S.y0) / (S.y1 - S.y0)))
+    push(S.x + Math.cos(a) * rad, y, S.z + Math.sin(a) * rad, 'ventures', 0.7 + 0.3 * rnd())
+  }
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3))
+  const mat = new THREE.PointsMaterial({
+    size: isNarrowViewport() ? 0.1 : 0.085,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.9,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  })
+  const points = new THREE.Points(geo, mat)
+  points.userData.base = col.slice()
+  points.userData.keys = pointKeys
+  return points
+}
+
+/** Brighten one region of the outline and dim the rest (null: all at rest). */
+function tintShell(key) {
+  if (!shell) return
+  const col = shell.geometry.attributes.color.array
+  const base = shell.userData.base
+  const keys = shell.userData.keys
+  for (let i = 0; i < keys.length; i += 1) {
+    const k = !key ? 1 : keys[i] === key ? 1.7 : 0.25
+    col[3 * i] = base[3 * i] * k
+    col[3 * i + 1] = base[3 * i + 1] * k
+    col[3 * i + 2] = base[3 * i + 2] * k
+  }
+  shell.geometry.attributes.color.needsUpdate = true
+}
+
+/** Fly the camera to a point in the graph (group-local), keeping the current view direction. */
+function flyTo(local, dist) {
+  const world = local.clone()
+  graphGroup.localToWorld(world)
+  const dir = camera.position.clone().sub(world).normalize()
+  dir.y = Math.max(dir.y, 0.08)
+  dir.normalize()
+  // stay outside the brain, so its outline never fills the lens: |world + dir*d - centre| >= rOut
+  const centre = new THREE.Vector3(BRAIN.cerebrum.c[0] * SCALE, BRAIN.cerebrum.c[1] * SCALE, BRAIN.cerebrum.c[2] * SCALE)
+  graphGroup.localToWorld(centre)
+  const rOut = Math.max(...BRAIN.cerebrum.r) * SCALE * 1.08
+  const o = world.clone().sub(centre)
+  const b = o.dot(dir)
+  const disc = b * b - (o.lengthSq() - rOut * rOut)
+  if (disc > 0) dist = Math.max(dist, -b + Math.sqrt(disc))
+  const camTarget = world.clone().add(dir.multiplyScalar(dist))
+  if (cameraTween) cameraTween.kill()
+  const from = new THREE.Vector3()
+  camera.getWorldDirection(from)
+  const look = camera.position.clone().add(from.multiplyScalar(camera.position.distanceTo(world)))
+  const state = { k: 0 }
+  const p0 = camera.position.clone()
+  cameraTween = gsap.to(state, {
+    k: 1,
+    duration: reduceMotion ? 0 : 0.9,
+    ease: 'power3.inOut',
+    onUpdate: () => {
+      camera.position.lerpVectors(p0, camTarget, state.k)
+      camera.lookAt(look.clone().lerp(world, state.k))
+    },
+  })
+}
+
+function focusLobe(key) {
+  const R = REGIONS[key]
+  if (!R || !camera) return
+  focused.value = null
+  focusedMesh = null
+  focusedLobe.value = key
+  autoRotate = false
+  applyHoverDim(null)
+  tintShell(key)
+  // the region's middle: where its nodes settled, or its centre before they did
+  const list = nodeMeshes.filter((m) => m.userData.node.domain === key)
+  const c = new THREE.Vector3()
+  let span = 0
+  if (list.length) {
+    list.forEach((m) => c.add(m.position))
+    c.divideScalar(list.length)
+    list.forEach((m) => {
+      span = Math.max(span, m.position.distanceTo(c))
+    })
+  } else {
+    c.set(R.at[0] * SCALE, R.at[1] * SCALE, R.at[2] * SCALE)
+  }
+  const fov = (camera.fov * Math.PI) / 180
+  const fitDist = ((span + 1.2) / Math.tan(fov / 2)) * (camera.aspect < 1 ? 1.25 / camera.aspect : 1.05)
+  flyTo(c, Math.max(6, fitDist))
+}
+
+function toggleLobe(key) {
+  if (focusedLobe.value === key && !focused.value) clearFocus()
+  else focusLobe(key)
+}
+
+function focusById(id) {
+  const mesh = nodeMeshes.find((m) => m.userData.node.id === id)
+  if (mesh) focusNode(mesh)
+}
+
+function onKey(e) {
+  if (e.key === 'Escape' && (focused.value || focusedLobe.value)) clearFocus()
 }
 
 function bindPointer() {
@@ -528,7 +817,7 @@ function bindPointer() {
           el.setPointerCapture?.(e.pointerId)
           touchOrbitCandidate = null
         } else {
-          // Vertical wins — abandon orbit so the page can scroll
+          // Vertical wins - abandon orbit so the page can scroll
           touchOrbitCandidate = null
         }
       }
@@ -569,7 +858,7 @@ function bindPointer() {
     const hit = hits[0]?.object ?? null
     hovered.value = hit ? hit.userData.node : null
     applyHoverDim(hit?.userData.node.id ?? null)
-    autoRotate = !hovered.value
+    autoRotate = !hovered.value && !focused.value && !focusedLobe.value
   }
 
   const onDown = (e) => {
@@ -584,7 +873,7 @@ function bindPointer() {
         pinchStartZoom = zoomFactor
         autoRotate = false
       } else if (activePointers.size === 1) {
-        // Candidate only — vertical swipe scrolls the page until horizontal wins
+        // Candidate only - vertical swipe scrolls the page until horizontal wins
         touchOrbitCandidate = { pointerId: e.pointerId, x: e.clientX, y: e.clientY }
       }
       return
@@ -624,7 +913,7 @@ function bindPointer() {
       orbitState = null
     }
     el.releasePointerCapture?.(e.pointerId)
-    autoRotate = !hovered.value && !focused.value
+    autoRotate = !hovered.value && !focused.value && !focusedLobe.value
   }
 
   el.addEventListener('pointermove', onMove, { passive: true })
@@ -679,28 +968,21 @@ const focusNode = (mesh) => {
   const n = mesh.userData.node
   focused.value = n
   focusedMesh = mesh
+  if (focusedLobe.value && focusedLobe.value !== n.domain) focusedLobe.value = null
+  tintShell(n.domain)
   applyHoverDim(n.id)
 
-  const world = mesh.getWorldPosition(new THREE.Vector3())
-  const dir = world.clone().normalize()
-  // Stay farther so focus keeps neighbors in frame (not one giant sphere)
-  const pull = isNarrowViewport() ? 11 : 9.5
-  const lift = isNarrowViewport() ? 3.0 : 2.4
-  const camTarget = world.clone().add(new THREE.Vector3(dir.x * pull, lift, dir.z * pull))
-  if (cameraTween) cameraTween.kill()
-  cameraTween = gsap.to(camera.position, {
-    x: camTarget.x,
-    y: camTarget.y,
-    z: camTarget.z,
-    duration: 0.9,
-    ease: 'power3.inOut',
-    onUpdate: () => camera.lookAt(world),
-  })
+  autoRotate = false
+  // stay far enough back that its neighbours stay in frame, and outside the brain
+  flyTo(mesh.position.clone(), isNarrowViewport() ? 11 : 9.5)
 }
 
 const clearFocus = () => {
   focused.value = null
   focusedMesh = null
+  focusedLobe.value = null
+  tintShell(null)
+  autoRotate = true
   applyHoverDim(hovered.value?.id ?? null)
   const pose = getZoomedHomeCam()
   if (cameraTween) cameraTween.kill()
@@ -720,7 +1002,7 @@ watch(hovered, (value) => {
   }
 })
 
-watch(focused, async () => {
+watch([focused, focusedLobe], async () => {
   if (!isNarrowViewport()) return
   await nextTick()
   ScrollTrigger.refresh()
@@ -755,13 +1037,21 @@ onMounted(() => {
     const hits = raycaster.intersectObjects(nodeMeshes)
     if (hits.length) {
       focusNode(hits[0].object)
-    } else if (focused.value) {
+      return
+    }
+    // a click on the brain itself opens the region it landed in
+    const shellHit = shell ? raycaster.intersectObject(shell)[0] : null
+    if (shellHit && !focusedLobe.value && !focused.value) {
+      const key = shell.userData.keys[shellHit.index]
+      if (key) focusLobe(key)
+    } else if (focused.value || focusedLobe.value) {
       clearFocus()
     }
   }
 
   graphRef.value?.addEventListener('click', onCanvasClick)
   graphRef.value._clickHandler = onCanvasClick
+  window.addEventListener('keydown', onKey)
 })
 
 onUnmounted(() => {
@@ -781,7 +1071,14 @@ onUnmounted(() => {
     el.removeEventListener('pointercancel', el._handlers.onUp)
   }
   el?.removeEventListener('click', el._clickHandler)
+  window.removeEventListener('keydown', onKey)
   activePointers.clear()
+
+  if (shell) {
+    shell.geometry.dispose()
+    shell.material.dispose()
+    shell = null
+  }
 
   nodeMeshes.forEach((m) => {
     m.material.dispose()
@@ -841,6 +1138,123 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
+}
+
+.star-map__legend-item {
+  min-height: 32px;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.star-map__legend-item:hover,
+.star-map__legend-item.is-active {
+  color: var(--text-main);
+  border-color: var(--domain-color);
+}
+
+.star-map__hint {
+  margin: 0.2rem 0 0;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.star-map__regions {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.star-map__region {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--domain-color) 55%, transparent);
+  border-radius: 999px;
+  background: rgba(10, 14, 23, 0.72);
+  backdrop-filter: blur(6px);
+  white-space: nowrap;
+  opacity: 0;
+  transition:
+    opacity 0.25s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+  will-change: transform;
+}
+
+.star-map__region:hover,
+.star-map__region:focus-visible {
+  border-color: var(--domain-color);
+  background: rgba(10, 14, 23, 0.92);
+}
+
+.star-map__region-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.star-map__region-domain {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--domain-color);
+}
+
+.star-map__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.star-map__chip {
+  min-height: 36px;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--domain-color) 45%, transparent);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: var(--text-main);
+  transition: border-color 0.2s ease;
+}
+
+.star-map__chip span {
+  margin-left: 0.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-muted);
+}
+
+.star-map__chip:hover,
+.star-map__chip:focus-visible {
+  border-color: var(--domain-color);
+}
+
+.star-map__panel-back {
+  margin: 0 0 0.5rem;
+  min-height: 32px;
+  font-size: 0.78rem;
+  color: var(--accent);
 }
 
 .star-map__legend-item i {
@@ -1047,6 +1461,11 @@ onUnmounted(() => {
   .star-map__label {
     font-size: 0.65rem;
     letter-spacing: 0.05em;
+  }
+
+  /* too many to fit side by side on a phone: the legend and a tap on the brain zoom instead */
+  .star-map__regions {
+    display: none;
   }
 
   .star-map__panel {

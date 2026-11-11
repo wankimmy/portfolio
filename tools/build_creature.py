@@ -9,7 +9,7 @@ The sculpt keeps its axes: no rotation, no mirror. Only a uniform scale (largest
 dimension = 2) and a re-centre of the bounding box on the origin.
 
 Run headless:
-    blender -b -P tools/build_creature.py -- <naga|whale|phoenix> [lite]
+    blender -b -P tools/build_creature.py -- <naga|whale|phoenix|kaiju> [lite]
 
 Inputs:  tools/ref/creature-<name>-raw.glb
 Outputs: public/models/creature-<name>.glb        (full: ~50k tris, 2048 normal)
@@ -51,8 +51,8 @@ v4 = v5.v4
 log = v4.log
 
 ARGS = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
-if not ARGS or ARGS[0] not in ("naga", "whale", "phoenix"):
-    raise SystemExit("usage: blender -b -P tools/build_creature.py -- <naga|whale|phoenix> [lite]")
+if not ARGS or ARGS[0] not in ("naga", "whale", "phoenix", "kaiju"):
+    raise SystemExit("usage: blender -b -P tools/build_creature.py -- <naga|whale|phoenix|kaiju> [lite]")
 NAME = ARGS[0]
 LITE = "lite" in ARGS[1:]
 PLAIN = "plain" in ARGS[1:]  # also write an uncompressed tools/ref copy for the test stage
@@ -132,6 +132,27 @@ RECIPES = {
         crease_col=(0.22, 0.05, 0.03, 1.0), crease_w=0.50,
         tip_col=(0.95, 0.82, 0.52, 1.0), tip_w=0.60,
         rough=(0.36, 0.12),
+    ),
+    "kaiju": dict(  # the river colossus in the naga's place: jade armour, indigo tail, gold spike tips
+        up=(0.0, 1.0, 0.0),
+        density=55.0,
+        stretch=(1.0, 0.8, 1.0),
+        bump=0.012,
+        scale_ramp=[
+            (0.00, (0.06, 0.24, 0.21, 1.0)),
+            (0.45, (0.10, 0.34, 0.30, 1.0)),
+            (0.80, (0.16, 0.43, 0.37, 1.0)),
+            (1.00, (0.24, 0.52, 0.45, 1.0)),
+        ],
+        mottle=(0.18, 0.38, 0.34, 1.0), mottle_w=0.30,
+        back_col=(0.08, 0.30, 0.32, 1.0), back_w=0.70,
+        belly_col=(0.52, 0.62, 0.55, 1.0), belly_w=0.50,
+        grad=("dot", (1.0, 0.0, 0.0), (0.05, 0.85)),  # chest -> tail tip (the tail runs to +X): jade to indigo
+        tail_col=(0.18, 0.17, 0.40, 1.0), tail_w=0.80,
+        groove_col=(0.05, 0.12, 0.12, 1.0), groove_w=0.8,
+        crease_col=(0.04, 0.09, 0.10, 1.0), crease_w=0.5,
+        tip_col=(0.82, 0.62, 0.26, 1.0), tip_w=0.9,  # gold on horns, spikes, claws and teeth
+        rough=(0.48, 0.12),
     ),
 }
 R = RECIPES[NAME]

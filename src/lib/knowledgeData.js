@@ -1,12 +1,12 @@
 /** Knowledge Star Map — denser brain of skills, tools, and startups. */
 
 export const domains = [
-  { key: 'frontend', label: 'Frontend', color: '#4a90e2', rank: 0 },
-  { key: 'backend', label: 'Backend', color: '#d4af37', rank: 1 },
-  { key: 'ai', label: 'AI & Agents', color: '#b48ee6', rank: 2 },
-  { key: 'iot', label: 'IoT', color: '#4ec9b0', rank: 3 },
-  { key: 'devops', label: 'DevOps', color: '#e2e8f0', rank: 4 },
-  { key: 'ventures', label: 'Startups', color: '#e07a3a', rank: 5 },
+  { key: 'frontend', label: 'Frontend', color: '#4a90e2', rank: 0, region: 'Occipital lobe', blurb: 'Vision. Everything people see and touch.' },
+  { key: 'backend', label: 'Backend', color: '#d4af37', rank: 1, region: 'Parietal lobe', blurb: 'Ties every signal together: systems, payments and data.' },
+  { key: 'ai', label: 'AI & Agents', color: '#b48ee6', rank: 2, region: 'Frontal lobe', blurb: 'Plans, decides and thinks ahead. The agents live here.' },
+  { key: 'iot', label: 'IoT', color: '#4ec9b0', rank: 3, region: 'Cerebellum', blurb: 'Movement and control: code that moves real things.' },
+  { key: 'devops', label: 'DevOps', color: '#e2e8f0', rank: 4, region: 'Temporal lobe', blurb: 'Memory: the databases and servers that keep everything stored and running.' },
+  { key: 'ventures', label: 'Startups', color: '#e07a3a', rank: 5, region: 'Brain stem', blurb: 'Drive: the instinct to keep building and shipping.' },
 ]
 
 /**

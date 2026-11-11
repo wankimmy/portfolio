@@ -1,4 +1,8 @@
-// Naga: the serpent-dragon of Tasik Chini. Self-contained: THREE is handed in.
+// Gergasi, the river colossus, in the naga's place. Self-contained: THREE is handed in.
+// What shows is a Hunyuan3D sculpt (public/models/creature-kaiju*.glb) deformed by smooth weights;
+// the code-built serpent below is its fallback and still drives the springs and PEARL TIDE.
+//
+// The code serpent: the serpent-dragon of Tasik Chini.
 //
 // Build: a coiled spine with one full loop that passes in front of and behind
 // itself, a smooth lofted body with a generated shingle normal map that follows
@@ -14,7 +18,10 @@
 // fall as slow rain and fade, with ripples where the stream broke and a soft mist (sprites).
 // Every offset is scaled by the room the page gives (roomUp, roomDown), so nothing crosses the band.
 
-export function createCreature(THREE, { envMap, lite }) {
+const KAIJU_URL = '/models/creature-kaiju.glb'
+const KAIJU_URL_LITE = '/models/creature-kaiju-lite.glb'
+
+export async function createCreature(THREE, { envMap, lite }) {
   const TAU = Math.PI * 2
   const N = lite ? 140 : 200 // body rings, tail tip (0) to neck (N-1)
   const SEG = lite ? 24 : 48 // body segments around
@@ -1034,6 +1041,8 @@ export function createCreature(THREE, { envMap, lite }) {
   }
 
   let moveT = -1 // seconds into the move, -1 when idle
+  let disposed = false
+  let sculpt = null // the kaiju sculpt, once loaded (see loadSculpt)
   let kick = 0 // whip force on the springs while the move runs
   let hf = 0 // head offset forward (model units) while the move runs
   let hu = 0 // head offset up
@@ -1310,6 +1319,8 @@ export function createCreature(THREE, { envMap, lite }) {
     frillGeo.attributes.position.needsUpdate = true
     frillGeo.computeVertexNormals()
 
+    if (sculpt) deformSculpt(time, e, g1, s1)
+
     // the move's effects: pearls and droplets, ripples where the stream breaks, and the mist
     const floorY = -rd * WR * 0.92
     const ceilY = ru * WR * 0.92
@@ -1397,7 +1408,230 @@ export function createCreature(THREE, { envMap, lite }) {
   // how far the rest silhouette reaches from the centre; the move stays inside the room the page gives
   const reach = { up: (maxY - cyB) * s + 0.1 * (w + SLACK_X) * s, down: (cyB - minY) * s + 0.25 * (w + SLACK_X) * s }
 
+  // ---- the kaiju sculpt: the river colossus that holds this place now. Loaded once and deformed on
+  // the CPU each frame by smooth weights from its rest shape (never bound to the serpent's rings, so it
+  // cannot tear): it breathes, the tail sways on the tail springs, and on PEARL TIDE it rears back,
+  // then lunges and exhales the pearls from its own mouth. The code serpent stays hidden as the fallback.
+  async function loadSculpt() {
+    const [{ GLTFLoader }, { DRACOLoader }] = await Promise.all([
+      import('three/examples/jsm/loaders/GLTFLoader.js'),
+      import('three/examples/jsm/loaders/DRACOLoader.js'),
+    ])
+    const draco = new DRACOLoader()
+    draco.setDecoderPath('/draco/')
+    const loader = new GLTFLoader()
+    loader.setDRACOLoader(draco)
+    let gltf
+    try {
+      gltf = await loader.loadAsync(lite ? KAIJU_URL_LITE : KAIJU_URL)
+    } finally {
+      draco.dispose()
+    }
+    gltf.scene.updateMatrixWorld(true)
+    let src = null
+    gltf.scene.traverse((c) => {
+      if (c.isMesh && !src) src = c
+    })
+    const freeScene = () =>
+      gltf.scene.traverse((c) => {
+        if (c.geometry) c.geometry.dispose()
+        for (const mt of [].concat(c.material || [])) if (mt !== src?.material) mt.dispose()
+      })
+    if (!src) {
+      freeScene()
+      throw new Error('kaiju sculpt has no mesh')
+    }
+    const geo = src.geometry.clone()
+    geo.applyMatrix4(src.matrixWorld)
+    freeScene()
+    const m = src.material
+    const tex = [m.map, m.aoMap, m.roughnessMap, m.normalMap].filter(Boolean)
+    if (disposed) {
+      geo.dispose()
+      for (const t of tex) t.dispose()
+      m.dispose()
+      return
+    }
+    // centre on the bounding box, largest side 2
+    geo.computeBoundingBox()
+    const bb = geo.boundingBox
+    const sw = bb.max.x - bb.min.x
+    const sh = bb.max.y - bb.min.y
+    const sn = 2 / Math.max(sw, sh)
+    geo.translate(-(bb.min.x + bb.max.x) / 2, -(bb.min.y + bb.max.y) / 2, -(bb.min.z + bb.max.z) / 2)
+    geo.scale(sn, sn, sn)
+    const pos = geo.attributes.position.array
+    const n = geo.attributes.position.count
+    const P0 = Float32Array.from(pos)
+    const hw = (sw * sn) / 2
+    const hh = (sh * sn) / 2
+
+    // weights from the rest shape (u, v: -1..1 across the half width and height). The kaiju faces
+    // screen left: head and jaws up at -u, the tail sweeping out to +u, the feet planted at -v.
+    const wH = new Float32Array(n) // head and neck
+    const wT = new Float32Array(n) // tail
+    const wU = new Float32Array(n) // upper body: leans on the hips for the rear-back and the lunge
+    let tipX = Infinity
+    let tipY = 0
+    for (let i = 0; i < n; i += 1) {
+      const u = P0[3 * i] / hw
+      const v = P0[3 * i + 1] / hh
+      wH[i] = smooth(0.0, -0.45, u) * smooth(0.0, 0.45, v)
+      wT[i] = smooth(0.12, 0.7, u) * smooth(0.55, 0.25, v)
+      wU[i] = smooth(-0.3, 0.15, v) * smooth(0.5, 0.15, u)
+      if (v > 0.3 && P0[3 * i] < tipX) {
+        tipX = P0[3 * i]
+        tipY = P0[3 * i + 1]
+      }
+    }
+    geo.attributes.position.setUsage(THREE.DynamicDrawUsage)
+    geo.deleteAttribute('normal') // flat-shaded: the shader derives each face
+
+    const mat = new THREE.MeshPhysicalMaterial({
+      map: m.map || null,
+      aoMap: m.aoMap || null,
+      roughnessMap: m.roughnessMap || null,
+      roughness: 0.7,
+      metalness: 0.1,
+      normalMap: m.normalMap || null,
+      flatShading: true,
+      side: THREE.DoubleSide,
+      envMap,
+      envMapIntensity: lite ? 0.55 : 0.65,
+      emissive: new THREE.Color(0, 0, 0),
+    })
+    if (m.normalMap) mat.normalScale.copy(m.normalScale)
+    if (!lite) {
+      mat.clearcoat = 0.35
+      mat.clearcoatRoughness = 0.35
+    }
+    // a cold river rim on the silhouette, like moonlight off wet scales
+    mat.onBeforeCompile = (shader) => {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+        float rimF = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 3.0);
+        totalEmissiveRadiance += vec3(0.1, 0.42, 0.36) * rimF * 0.2;`,
+      )
+    }
+    m.dispose()
+
+    // the frame in group units: the sculpt fills the creature's box with room for the sway and the lunge
+    const fw = 2 * hw * 1.1
+    const fh = 2 * hh * 1.08
+    const hs = 2 / (Math.max(fw, fh) * s)
+    const mesh = new THREE.Mesh(geo, mat)
+    mesh.frustumCulled = false
+    const holder = new THREE.Group()
+    holder.position.set(cxB, cyB, 0)
+    holder.scale.setScalar(hs)
+    holder.add(mesh)
+    group.add(holder)
+    for (const c of [bodyMesh, finMesh, tailMesh, headRoot]) c.visible = false
+    size.x = fw * hs * s
+    size.y = fh * hs * s
+    reach.up = size.y / 2 + 0.05 * size.x
+    reach.down = size.y / 2 + 0.15 * size.x
+    // the move now comes from the kaiju: its mouth, its facing, and its middle for the mist to settle on
+    W = 2 * hw * hs
+    const toG = (x, y) => [cxB + x * hs, cyB + y * hs]
+    const [mx0, my0] = toG(tipX + 0.06 * hw, tipY - 0.05 * hh)
+    mouthRest[0] = mx0
+    mouthRest[1] = my0
+    mouthRest[2] = 0.05 * W
+    Fv.set(-0.97, -0.14, 0.2).normalize()
+    Uv.set(-0.14, 0.99, 0).normalize()
+    Sv.crossVectors(Fv, Uv).normalize()
+    mcx = cxB
+    mcy = cyB
+    mcz = 0
+    sculpt = { geo, mat, tex, P0, pos, wH, wT, wU, n, hw, hh, hs }
+  }
+
+  // one frame of the kaiju's motion: breath, tail sway with the springs' lag, the rear-back and the lunge
+  function deformSculpt(time, e, g1, s1) {
+    const S = sculpt
+    const P0 = S.P0
+    const p = S.pos
+    const hw = S.hw
+    const hh = S.hh
+    const breath = Math.sin(time * 1.4)
+    // the upper body leans about the hips: back as the move gathers, forward into the strike
+    const lean = 0.02 * Math.sin(time * 0.7) - 0.16 * g1 + 0.2 * s1
+    const cl = Math.cos(lean)
+    const sl = Math.sin(lean)
+    const hipX = 0.05 * hw
+    const hipY = -0.15 * hh
+    // the head pitches on top: up and back as it draws breath, snapping down and forward to exhale
+    const nod = 0.03 * Math.sin(time * 0.9) * (1 + e) - 0.14 * g1 + 0.1 * s1
+    const cn = Math.cos(nod)
+    const sn = Math.sin(nod)
+    const nkX = -0.28 * hw
+    const nkY = 0.32 * hh
+    // the head's own offset on the move, from the serpent's head path (group units back to sculpt units)
+    const hx = (Fv.x * hf + Uv.x * hu) / S.hs
+    const hy = (Fv.y * hf + Uv.y * hu) / S.hs
+    const lag = (tailX[3] + 0.5 * tailX[1]) * 0.6
+    const lagY = (tailY[3] + 0.5 * tailY[1]) * 0.6
+    const tAmp = (0.045 + 0.03 * e) * (1 + 0.8 * s1)
+    const shake = s1 * 0.006 * Math.sin(time * 37)
+    for (let i = 0; i < S.n; i += 1) {
+      const k3 = 3 * i
+      let x = P0[k3]
+      let y = P0[k3 + 1]
+      let z = P0[k3 + 2]
+      const wu = S.wU[i]
+      if (wu > 0) {
+        // breath swells the chest a touch, then the lean turns the whole upper body on the hips
+        y += wu * 0.008 * breath * hh
+        const dx = x - hipX
+        const dy = y - hipY
+        const c = 1 + (cl - 1) * wu
+        const sv = sl * wu
+        x = hipX + dx * c - dy * sv
+        y = hipY + dx * sv + dy * c
+        x += wu * shake
+      }
+      const wh = S.wH[i]
+      if (wh > 0) {
+        const dx = x - nkX
+        const dy = y - nkY
+        const c = 1 + (cn - 1) * wh
+        const sv = sn * wh
+        x = nkX + dx * c - dy * sv + wh * hx
+        y = nkY + dx * sv + dy * c + wh * hy
+      }
+      const wt = S.wT[i]
+      if (wt > 0) {
+        const w2 = wt * wt
+        const ph = time * 1.1 - x * 2.2
+        z += w2 * (tAmp * 1.6 * Math.sin(ph) + lag)
+        y += w2 * (tAmp * 0.5 * Math.sin(ph * 0.8 + 1.2) + lagY)
+      }
+      p[k3] = x
+      p[k3 + 1] = y
+      p[k3 + 2] = z
+    }
+    S.geo.attributes.position.needsUpdate = true
+    // a cold glow wells up through the scales as it exhales
+    const gl = 0.35 * s1 + 0.1 * g1
+    S.mat.emissive.setRGB(0.04 * gl, 0.3 * gl, 0.26 * gl)
+  }
+
+  try {
+    await loadSculpt()
+  } catch (err) {
+    console.warn('kaiju sculpt not shown, the code-built naga stays:', err)
+  }
+
   const dispose = () => {
+    disposed = true
+    if (sculpt) {
+      sculpt.geo.dispose()
+      sculpt.mat.dispose()
+      for (const t of sculpt.tex) t.dispose()
+      sculpt = null
+    }
     for (const g of [bodyGeo, finGeo, tailGeo, headGeo, jawGeo, eyeGeo, barbelGeo, frillGeo, pearlGeo, ringGeo]) g.dispose()
     for (const m of [bodyMat, finMat, eyeMat, pearlMat]) m.dispose()
     for (const r of rings) r.material.dispose()

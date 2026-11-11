@@ -1,8 +1,57 @@
 /**
  * Deterministic 3D force simulation for the knowledge graph.
- * Domain lobes (brain hemispheres) + repulsion + link springs.
+ * Each domain lives in one region of a brain (side view, the face toward -x):
+ * repulsion and link springs spread the nodes, a lobe pull groups them, and a
+ * containment force keeps every node inside its part of the brain.
  * Seeded RNG so reloads produce the same layout.
  */
+
+/**
+ * The brain's parts in simulation units: ellipsoids (c centre, r radii) and the stem
+ * (a vertical capsule). The component draws the shell from the same numbers.
+ */
+export const BRAIN = {
+  cerebrum: { c: [0, 0.5, 0], r: [4.6, 3.0, 3.3] },
+  cerebellum: { c: [2.75, -2.25, 0], r: [1.7, 1.0, 2.0] },
+  stem: { x: 1.25, z: 0, y0: -4.7, y1: -1.4, rad: 0.75 },
+}
+
+/** Where each domain sits, and the part that holds it. */
+export const REGIONS = {
+  ai: { at: [-3.0, 1.3, 0], part: 'cerebrum' }, // frontal lobe
+  backend: { at: [0.5, 2.0, 0], part: 'cerebrum' }, // parietal lobe
+  frontend: { at: [3.1, 0.7, 0], part: 'cerebrum' }, // occipital lobe
+  devops: { at: [-0.4, -1.5, 0], part: 'cerebrum' }, // temporal lobe
+  iot: { at: [2.75, -2.25, 0], part: 'cerebellum' },
+  ventures: { at: [1.25, -3.1, 0], part: 'stem' },
+}
+
+/** Pull (px, py, pz) back inside a part; returns the correction to add (zero when inside). */
+function containOffset(part, x, y, z, margin) {
+  if (part === 'stem') {
+    const S = BRAIN.stem
+    const cy = Math.min(S.y1, Math.max(S.y0, y))
+    const dx = x - S.x
+    const dz = z - S.z
+    const d = Math.hypot(dx, dz)
+    const lim = S.rad * margin
+    let ox = 0
+    let oz = 0
+    if (d > lim) {
+      ox = -dx * (1 - lim / d)
+      oz = -dz * (1 - lim / d)
+    }
+    return [ox, cy - y, oz]
+  }
+  const E = BRAIN[part]
+  const ux = (x - E.c[0]) / E.r[0]
+  const uy = (y - E.c[1]) / E.r[1]
+  const uz = (z - E.c[2]) / E.r[2]
+  const e = Math.hypot(ux, uy, uz)
+  if (e <= margin) return [0, 0, 0]
+  const k = 1 - margin / e
+  return [-(x - E.c[0]) * k, -(y - E.c[1]) * k, -(z - E.c[2]) * k]
+}
 
 function mulberry32(seed) {
   let t = seed >>> 0
@@ -27,25 +76,17 @@ export function createGraphForce(nodes, edges, domains, opts = {}) {
   const domainIndex = Object.fromEntries(domains.map((d, i) => [d.key, i]))
   const byId = Object.fromEntries(nodes.map((n) => [n.id, n]))
 
-  // Six lobes around a ring — keeps the map wide like a brain, not a stick
-  const lobeRadius = 4.2
+  // One brain region per domain (unknown domains sit in the middle of the cerebrum)
   const lobeCenters = Object.fromEntries(
-    domains.map((d, i) => {
-      const a = (i / Math.max(1, domains.length)) * Math.PI * 2 - Math.PI / 2
-      return [
-        d.key,
-        {
-          x: Math.cos(a) * lobeRadius,
-          y: Math.sin(a * 1.7) * 0.85,
-          z: Math.sin(a) * lobeRadius * 0.92,
-        },
-      ]
+    domains.map((d) => {
+      const at = REGIONS[d.key]?.at ?? BRAIN.cerebrum.c
+      return [d.key, { x: at[0], y: at[1], z: at[2], part: REGIONS[d.key]?.part ?? 'cerebrum' }]
     }),
   )
 
   const sims = nodes.map((n, idx) => {
     const lobe = lobeCenters[n.domain] ?? { x: 0, y: 0, z: 0 }
-    const jitter = 0.55 + rand() * 1.1
+    const jitter = lobe.part === 'cerebrum' ? 0.55 + rand() * 1.1 : 0.2 + rand() * 0.5
     const theta = rand() * Math.PI * 2
     const phi = (rand() - 0.5) * Math.PI * 0.7
     return {
@@ -93,8 +134,9 @@ export function createGraphForce(nodes, edges, domains, opts = {}) {
   const charge = -2.8
   const linkDistance = 1.85
   const linkStrength = 0.42
-  const centerStrength = 0.012
+  const centerStrength = 0.004
   const clusterStrength = 0.085
+  const containStrength = 0.35
 
   const tick = () => {
     if (alpha < alphaMin) return false
@@ -177,9 +219,10 @@ export function createGraphForce(nodes, edges, domains, opts = {}) {
 
       const lobe = lobeCenters[s.domain]
       if (lobe) {
+        // a soft pull across the midline, so a lobe fills both hemispheres
         s.vx += (lobe.x - s.x) * clusterStrength * alpha
         s.vy += (lobe.y - s.y) * clusterStrength * alpha
-        s.vz += (lobe.z - s.z) * clusterStrength * alpha
+        s.vz += (lobe.z - s.z) * clusterStrength * 0.3 * alpha
       }
 
       s.vx -= s.x * centerStrength * alpha
@@ -193,6 +236,12 @@ export function createGraphForce(nodes, edges, domains, opts = {}) {
       s.x += s.vx
       s.y += s.vy
       s.z += s.vz
+
+      // stay inside the brain: a firm push back whatever alpha is, so a drag cannot leave it
+      const [ox, oy, oz] = containOffset(lobe?.part ?? 'cerebrum', s.x, s.y, s.z, 0.86)
+      s.x += ox * containStrength
+      s.y += oy * containStrength
+      s.z += oz * containStrength
     }
 
     return true

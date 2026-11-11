@@ -348,7 +348,7 @@ export const certificates = [
 export const bestiary = {
   naga: {
     no: '01',
-    name: 'Naga',
+    name: 'Gergasi',
     role: 'Keeper of the forge',
     line: 'It guards the weapons in the next room. Nine years of them.',
     side: 'left',
