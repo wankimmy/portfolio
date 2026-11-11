@@ -32,8 +32,7 @@ export const SCENES = {
     about: { veil: 0.7, cast: { dragon: { x: 0.9, y: 0.52, scale: 0.78, yaw: -0.75, pitch: 0.22, roll: -0.08 } } },
     'encounter-naga': { veil: 0.1, cast: { naga: { box: true, x: 0, y: 0, scale: 1, yaw: 0, ...FLAT } } },
     tech: { veil: 0.74, cast: { naga: { x: 0, y: 0, scale: 0.86, yaw: 0.15, pitch: 0.05, roll: 0 } } },
-    'encounter-whale': { veil: 0.1, cast: { whale: { box: true, x: 0, y: 0, scale: 1, yaw: 0, ...FLAT } } },
-    experience: { veil: 0.74, cast: { whale: { x: -0.86, y: -0.4, scale: 0.5, yaw: 0.25, pitch: -0.06, roll: 0.04 } } },
+    experience: { veil: 0.74, cast: {} },
     projects: { veil: 0.86, cast: {} },
     'encounter-phoenix': { veil: 0.1, cast: { phoenix: { box: true, x: 0, y: 0, scale: 1.12, yaw: 0, ...FLAT } } },
     services: { veil: 0.66, cast: { phoenix: { x: 0.98, y: -0.6, scale: 0.4, yaw: -0.45, pitch: 0, roll: -0.05 } } },
@@ -49,7 +48,6 @@ export const SCENES = {
     // a little smaller than its box: the whiskers and tail fan swing past the rest silhouette
     'encounter-naga': { veil: 0.1, cast: { naga: { box: true, x: 0, y: 0, scale: 0.9, yaw: 0, ...FLAT } } },
     tech: { veil: 0.86, cast: {} },
-    'encounter-whale': { veil: 0.1, cast: { whale: { box: true, x: 0, y: 0, scale: 1, yaw: 0, ...FLAT } } },
     experience: { veil: 0.9, cast: {} },
     projects: { veil: 0.9, cast: {} },
     'encounter-phoenix': { veil: 0.1, cast: { phoenix: { box: true, x: 0, y: 0, scale: 1, yaw: 0, ...FLAT } } },
@@ -73,13 +71,12 @@ export const isEncounter = (id) => id.startsWith('encounter-')
  * so it never crosses the header above it or the copy below it. The number is
  * the side it uses (-1 left, +1 right); x is in half-boxes, far past the edge.
  */
-export const SIDE = { dragon: -1, naga: 1, whale: -1, phoenix: 1 }
+export const SIDE = { dragon: -1, naga: 1, phoenix: 1 }
 export const OFF_SIDE = 6
 
 /** Where each creature waits off stage on wide screens: its way in and its way out. */
 export const PARK = {
   dragon: { x: 0.1, y: 1.6, scale: 0.6, yaw: 0.9, pitch: 0.5, roll: 0.2 },
   naga: { x: 2.1, y: -0.15, scale: 0.8, yaw: 0.5, pitch: 0, roll: 0 },
-  whale: { x: -2.3, y: 0.15, scale: 0.8, yaw: 0.2, pitch: 0, roll: 0 },
   phoenix: { x: 0, y: -1.9, scale: 0.7, yaw: 0, pitch: -0.2, roll: 0 },
 }

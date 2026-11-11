@@ -16,6 +16,11 @@
  */
 import { createFlame } from '../flame.js'
 
+// the sculpt (Hunyuan3D-2mini + Blender bake, tools/build_creature.py). It replaces the code-built
+// bird on screen; the code bird stays as the fallback and as the skeleton the move's fire reads.
+const MODEL_URL = '/models/creature-phoenix.glb'
+const MODEL_URL_LITE = '/models/creature-phoenix-lite.glb'
+
 const TAU = Math.PI * 2
 const HALF_PI = Math.PI / 2
 
@@ -27,6 +32,7 @@ const AMBER = [0.9, 0.4, 0.1]
 const GOLD = [0.98, 0.72, 0.36]
 const PEARL = [0.95, 0.88, 0.76]
 const HOT = [1.9, 1.2, 0.5]
+const FLAME_GOLD = [0.95, 0.5, 0.1] // the sculpt's outer feathers: saturated, so the white albedo does not wash it out
 const EYE_DARK = [0.16, 0.03, 0.012]
 
 const SHOULDER = [0.12, 0.3, 0]
@@ -537,7 +543,7 @@ function buildEyes(b, S) {
  * @param {typeof import('three')} THREE
  * @param {{ envMap: import('three').Texture, lite: boolean }} options
  */
-export function createCreature(THREE, { envMap, lite }) {
+export async function createCreature(THREE, { envMap, lite }) {
   const NC = lite ? 7 : 13 // feather columns across the vane
   const RP = lite ? 13 : 16 // primary rows
   const RS = lite ? 3 : 4 // secondary rows
@@ -1334,6 +1340,227 @@ export function createCreature(THREE, { envMap, lite }) {
   spriteMat.opacity = 0
   ringMat.opacity = 0
 
+  // ---- the sculpt: loaded once, deformed on the CPU each frame by smooth weights (never bound to
+  // rig triangles, so it cannot tear). Wings bend about the shoulders on the beat, the flame tail
+  // sways and lags on the plume springs, the head nods. Fire tones come from the rest shape.
+  const size = { x: W * k, y: H * k }
+  const holder = new THREE.Group()
+  let sculpt = null // { geo, mat, tex, P0, pos, wR, wL, wT, wH, pvX, pvY, hdY, n }
+  async function loadSculpt() {
+    const [{ GLTFLoader }, { DRACOLoader }] = await Promise.all([
+      import('three/examples/jsm/loaders/GLTFLoader.js'),
+      import('three/examples/jsm/loaders/DRACOLoader.js'),
+    ])
+    const draco = new DRACOLoader()
+    draco.setDecoderPath('/draco/')
+    const loader = new GLTFLoader()
+    loader.setDRACOLoader(draco)
+    let gltf
+    try {
+      gltf = await loader.loadAsync(lite ? MODEL_URL_LITE : MODEL_URL)
+    } finally {
+      draco.dispose()
+    }
+    gltf.scene.updateMatrixWorld(true)
+    let src = null
+    gltf.scene.traverse((c) => {
+      if (c.isMesh && !src) src = c
+    })
+    const freeScene = () =>
+      gltf.scene.traverse((c) => {
+        if (c.geometry) c.geometry.dispose()
+        for (const mt of [].concat(c.material || [])) {
+          if (mt === src?.material) continue // its maps move to the new material
+          mt.dispose()
+        }
+      })
+    if (!src) {
+      freeScene()
+      throw new Error('phoenix sculpt has no mesh')
+    }
+    const geo = src.geometry.clone()
+    geo.applyMatrix4(src.matrixWorld)
+    freeScene()
+    if (disposed) {
+      geo.dispose()
+      for (const key in src.material) if (src.material[key] && src.material[key].isTexture) src.material[key].dispose()
+      src.material.dispose()
+      return
+    }
+    // centre on the bounding box, largest side 2
+    geo.computeBoundingBox()
+    const bb0 = geo.boundingBox
+    const cx = (bb0.min.x + bb0.max.x) / 2
+    const cy = (bb0.min.y + bb0.max.y) / 2
+    const cz = (bb0.min.z + bb0.max.z) / 2
+    const sw = bb0.max.x - bb0.min.x
+    const sh = bb0.max.y - bb0.min.y
+    const s = 2 / Math.max(sw, sh)
+    geo.translate(-cx, -cy, -cz)
+    geo.scale(s, s, s)
+    const pos = geo.attributes.position.array
+    const n = geo.attributes.position.count
+    const P0 = Float32Array.from(pos)
+    const hw = (sw * s) / 2 // half width and half height, sculpt units
+    const hh = (sh * s) / 2
+
+    // weights from the rest shape (u, v: -1..1 across the half width and half height)
+    const wR = new Float32Array(n) // right wing (screen right, +x)
+    const wL = new Float32Array(n)
+    const wT = new Float32Array(n) // flame tail
+    const wH = new Float32Array(n) // head
+    const col = new Float32Array(n * 3)
+    const PIV_U = 0.13 // shoulders, as a share of the half width
+    const PIV_V = 0.1
+    for (let i = 0; i < n; i += 1) {
+      const u = P0[3 * i] / hw
+      const v = P0[3 * i + 1] / hh
+      const au = Math.abs(u)
+      // a wing: outboard of the shoulder and above the flames; graded so the bend is smooth
+      const out = smooth01((au - PIV_U + 0.04) / 0.5)
+      const above = smooth01((v + 0.18) / 0.22)
+      const w = out * above
+      if (u > 0) wR[i] = w
+      else wL[i] = w
+      // the tail: everything below the belly, more toward the bottom
+      wT[i] = smooth01((-v - 0.05) / 0.7) * (1 - w)
+      // the head and crest: high and near the middle
+      wH[i] = smooth01((v - 0.22) / 0.12) * (1 - smooth01((au - 0.16) / 0.1))
+      // fire tones: ember at the core, amber and gold outward, white-hot at the very tips
+      const d = Math.min(1, Math.hypot(u * 0.95, (v - 0.05) * 1.05))
+      const c =
+        d < 0.22
+          ? mix(DEEP, EMBER, d / 0.22)
+          : d < 0.6
+            ? mix(EMBER, AMBER, (d - 0.22) / 0.38)
+            : d < 0.9
+              ? mix(AMBER, FLAME_GOLD, (d - 0.6) / 0.3)
+              : mix(FLAME_GOLD, HOT, smooth01((d - 0.9) / 0.1))
+      // the head stays darker so the eye and beak read against it
+      const hc = wH[i] > 0 ? mix(c, mix(EMBER, AMBER, 0.4), 0.6 * wH[i]) : c
+      col[3 * i] = hc[0]
+      col[3 * i + 1] = hc[1]
+      col[3 * i + 2] = hc[2]
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3))
+    geo.attributes.position.setUsage(THREE.DynamicDrawUsage)
+    geo.deleteAttribute('normal') // flat-shaded: the shader derives each face
+
+    const m = src.material
+    const mat = new THREE.MeshPhysicalMaterial({
+      vertexColors: true,
+      map: m.map || null,
+      aoMap: m.aoMap || null,
+      roughnessMap: m.roughnessMap || null,
+      roughness: 0.75,
+      metalness: 0.1,
+      normalMap: m.normalMap || null,
+      flatShading: true,
+      side: THREE.DoubleSide,
+      envMap,
+      envMapIntensity: lite ? 0.5 : 0.6,
+      emissive: new THREE.Color(0, 0, 0),
+    })
+    if (m.normalMap) mat.normalScale.copy(m.normalScale)
+    if (!lite) {
+      mat.clearcoat = 0.3
+      mat.clearcoatRoughness = 0.4
+    }
+    // the hottest tones glow a little on their own, and a fire rim lights the silhouette
+    mat.onBeforeCompile = (shader) => {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+        float heatF = smoothstep(0.8, 1.2, vColor.g); // only the white-hot tips (HOT has g above 1)
+        totalEmissiveRadiance += vColor.rgb * heatF * 0.3;
+        float rimF = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 3.0);
+        totalEmissiveRadiance += vec3(1.0, 0.36, 0.08) * rimF * 0.22;`,
+      )
+    }
+    const tex = [m.map, m.aoMap, m.roughnessMap, m.normalMap].filter(Boolean)
+    m.dispose()
+
+    const mesh = new THREE.Mesh(geo, mat)
+    mesh.frustumCulled = false
+    holder.add(mesh)
+    group.add(holder)
+    for (const c of [bodyMesh, headPivot, wingMesh, tailMesh, tailEyeMesh]) c.visible = false
+    // the frame: the sculpt with room for the beat and the flame sway; the move's fire keeps its own fit
+    const fw = 2 * hw * 1.08
+    const fh = 2 * hh * 1.1
+    const kf = 2 / Math.max(fw, fh)
+    holder.userData.k = kf
+    holder.scale.setScalar(kf)
+    size.x = Math.max(fw * kf, W * k * 0.9)
+    size.y = Math.max(fh * kf, H * k * 0.9)
+    sculpt = { geo, mat, tex, P0, pos, wR, wL, wT, wH, n, pvX: PIV_U * hw, pvY: PIV_V * hh, hdY: 0.3 * hh, hh }
+  }
+
+  // one frame of the sculpt's motion, from the same envelopes the code bird uses
+  function deformSculpt(time, e) {
+    const S = sculpt
+    const b = beat(phase) * (1 - 0.9 * mFold) * (1 - 0.9 * mSpread)
+    // the rest pose is the top of the stroke: the beat lowers the wings from there
+    const stroke = (lite ? 0.38 : 0.46) * (1 - 0.35 * e) * (1 - 0.55 * mBand)
+    let ang = -(1 - b) * stroke
+    ang = lerp(ang, -1.15, mFold) // folded round the body for the burn
+    ang = lerp(ang, 0.12, mSpread) // thrown wide on the rebirth
+    ang += WG_X.length ? WG_X[NPRIM - 1] * 0.6 : 0 // the primaries' spring lag
+    const ca = Math.cos(ang)
+    const sa = Math.sin(ang)
+    const fwdZ = 0.12 * (1 - b) + 0.25 * mFold // the downstroke and the fold sweep a little forward
+    // tail: a slow wave down the flames, plus the plume springs (sideways lag on a turn or a shove)
+    const lag = (PL_X[2] + PL_X[11] + PL_X[20]) / 3
+    const tAmp = 0.05 * (1 + 0.6 * e) * (1 - 0.6 * mFold) * (1 - 0.4 * mBand)
+    const nod = headBob * 0.6
+    const P0 = S.P0
+    const p = S.pos
+    const px = S.pvX
+    const py = S.pvY
+    for (let i = 0; i < S.n; i += 1) {
+      const k3 = 3 * i
+      let x = P0[k3]
+      let y = P0[k3 + 1]
+      let z = P0[k3 + 2]
+      const wr = S.wR[i]
+      const wl = S.wL[i]
+      if (wr > 0 || wl > 0) {
+        // rotate about the shoulder, by the weight: the wing root bends softly, the tip swings fully
+        const w = wr > 0 ? wr : wl
+        const sgn = wr > 0 ? 1 : -1
+        const dx = x - sgn * px
+        const dy = y - py
+        const c = 1 + (ca - 1) * w
+        const s = sa * w * sgn
+        x = sgn * px + dx * c - dy * s
+        y = py + dx * s + dy * c
+        z += fwdZ * w * Math.abs(dx)
+      }
+      const wt = S.wT[i]
+      if (wt > 0) {
+        const ph = time * 1.7 + y * 3.2
+        x += wt * (tAmp * Math.sin(ph) + lag * 0.5)
+        z += wt * tAmp * 0.6 * Math.cos(ph * 0.8)
+      }
+      const wh = S.wH[i]
+      if (wh > 0) {
+        const dy = y - S.hdY
+        y += wh * dy * nod * 0.15
+        z += wh * (dy * nod + 0.02 * Math.sin(time * 0.55))
+      }
+      p[k3] = x
+      p[k3 + 1] = y
+      p[k3 + 2] = z
+    }
+    S.geo.attributes.position.needsUpdate = true
+  }
+
+  try {
+    await loadSculpt()
+  } catch (err) {
+    console.warn('phoenix sculpt not shown, the code-built phoenix stays:', err)
+  }
+
   function act() {
     if (moveT >= 0) return
     moveT = 0
@@ -1380,6 +1607,14 @@ export function createCreature(THREE, { envMap, lite }) {
     wingMesh.position.z = 0.22 * mFold
 
     pose(phase, time, e, true)
+    if (sculpt) {
+      // the sculpt shrinks into the flash and grows back with the body, and bobs on the beat
+      const hk = holder.userData.k * (mScale > 0.001 ? mScale : 0.001)
+      holder.scale.setScalar(hk)
+      holder.position.set(0, innerY, 0)
+      deformSculpt(time, e)
+      sculpt.mat.emissive.setRGB(0.9 * mGlow, 0.36 * mGlow, 0.1 * mGlow)
+    }
     setGlow(mGlow)
 
     wingGeo.attributes.position.needsUpdate = true
@@ -1451,12 +1686,18 @@ export function createCreature(THREE, { envMap, lite }) {
     barbTex.dispose()
     glowTex.dispose()
     ringTex.dispose()
+    if (sculpt) {
+      sculpt.geo.dispose()
+      sculpt.mat.dispose()
+      for (const t of sculpt.tex) t.dispose()
+      sculpt = null
+    }
     if (group.parent) group.removeFromParent()
   }
 
   return {
     group,
-    size: { x: W * k, y: H * k },
+    size,
     update,
     act,
     dispose,

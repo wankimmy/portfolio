@@ -824,6 +824,7 @@ export function createCreature(THREE, { envMap, lite }) {
   const G = new Float32Array(N).fill(1)
   const FL = new Float32Array(N)
   let eS = 0
+  let wavePh = 0 // integrated wave phase: omega changes with energy, so omega * time would jump on scroll
   const THICK = 0.012
 
   // ---- loose parts on springs. Each chain is a row of damped springs. A spring is pushed by the
@@ -1102,13 +1103,14 @@ export function createCreature(THREE, { envMap, lite }) {
     if (dt > 0) stepPhysics(time, dt, motion)
     const e = eS
     const omega = 2.0 + 3.0 * e
+    wavePh += omega * dt
     const amp = (0.9 + 0.5 * e) * (1 + 0.5 * s1 + 0.2 * g1)
     // spine: wave from behind the head to the tail, head stays still
     for (let i = 0; i < N; i++) {
       const u = U[i]
       const fade = smooth(1.0, 0.8, u)
       const A = fade * (0.1 + 0.07 * (1 - u)) * amp
-      const phi = KWAVE * (1 - u) - omega * time
+      const phi = KWAVE * (1 - u) - wavePh
       const disp = A * Math.sin(phi)
       const lat = A * 0.5 * Math.cos(phi * 0.7 + 0.6)
       const stretch = -0.06 * e * (1 - u)

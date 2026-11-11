@@ -98,7 +98,6 @@ export const FORMATIONS = {
   about: { shape: 'pillar', x: -0.965, y: 0, spin: 0.25, size: 0.8, tall: { x: -0.9 } },
   'encounter-naga': { shape: 'drift', x: 0, y: 0, size: 0.8 },
   tech: { shape: 'orbit', x: 0, y: 0, spin: 0.12, tall: { y: 0.1, spread: 0.7 } },
-  'encounter-whale': { shape: 'drift', x: 0, y: 0, size: 0.8 },
   experience: { shape: 'trail', x: 0, y: -0.9, size: 0.9 },
   projects: { shape: 'drift', x: 0, y: 0, size: 0.7 },
   'encounter-phoenix': { shape: 'drift', x: 0, y: 0, size: 0.8 },

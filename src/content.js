@@ -353,19 +353,12 @@ export const bestiary = {
     line: 'It guards the weapons in the next room. Nine years of them.',
     side: 'left',
   },
-  whale: {
-    no: '02',
-    name: 'Sky whale',
-    role: 'Carrier of the log',
-    line: 'It carries the whole quest log on its back, and it is in no hurry.',
-    side: 'right',
-  },
   phoenix: {
-    no: '03',
+    no: '02',
     name: 'Phoenix',
     role: 'Patron of the workshop',
     line: 'Things come here to be built, or rebuilt. It watches over both.',
-    side: 'left',
+    side: 'right',
   },
 }
 

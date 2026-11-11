@@ -4,7 +4,7 @@
 //
 //   node tools/audit_phone.mjs [baseUrl] [sizes] [stops]
 //   sizes: comma list of WxH (default: six phones from 320 to 430 wide)
-//   stops: comma list of home,encounter-naga,encounter-whale,encounter-phoenix,contact
+//   stops: comma list of home,encounter-naga,encounter-phoenix,contact
 //
 // It opens the site with ?mask=1 (createWorld.js draws the creatures alone on
 // black), reads the canvas pixel by pixel and compares it with the boxes of the
@@ -17,10 +17,10 @@ import { fileURLToPath } from 'node:url'
 const here = path.dirname(fileURLToPath(import.meta.url))
 const base = process.argv[2] || 'http://localhost:4173'
 const sizes = (process.argv[3] || '320x568,360x640,375x667,390x844,412x915,430x932').split(',').map((s) => s.split('x').map(Number))
-const stops = (process.argv[4] || 'home,encounter-naga,encounter-whale,encounter-phoenix,contact').split(',')
+const stops = (process.argv[4] || 'home,encounter-naga,encounter-phoenix,contact').split(',')
 const { chromium } = createRequire(path.join(here, '..', '..', 'sepang-rush', 'package.json'))('playwright')
 
-const ACTOR = { home: 'dragon', contact: 'dragon', 'encounter-naga': 'naga', 'encounter-whale': 'whale', 'encounter-phoenix': 'phoenix' }
+const ACTOR = { home: 'dragon', contact: 'dragon', 'encounter-naga': 'naga', 'encounter-phoenix': 'phoenix' }
 const COPY = 'h1, h2, h3, p, li, dt, dd, a, button, .label'
 
 /** Runs in the page: where the creature's pixels are, and which boxes they touch. */
@@ -104,7 +104,7 @@ for (const [width, height] of sizes) {
   await page.goto(`${base}/?intro=0&mask=1`, { waitUntil: 'load' })
   await page.waitForFunction(() => window.__world, null, { timeout: 60000 })
   // every creature built, and any model that loads late swapped in
-  await page.waitForFunction(() => ['naga', 'whale', 'phoenix'].every((n) => window.__world.actors[n].creature), null, { timeout: 90000 }).catch(() => {})
+  await page.waitForFunction(() => ['naga', 'phoenix'].every((n) => window.__world.actors[n].creature), null, { timeout: 90000 }).catch(() => {})
   await page.evaluate(async () => {
     await Promise.all(Object.values(window.__world.actors).map((a) => a.creature?.ready).filter(Boolean))
   })

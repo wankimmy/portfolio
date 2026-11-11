@@ -26,7 +26,7 @@ const MODULES = import.meta.glob('./creatures/*.js')
 const load = (name) => MODULES[`./creatures/${name}.js`]
 
 /** The dragon loads first and opens the page. These are built in code once it is on screen. */
-const LATER = ['naga', 'whale', 'phoenix']
+const LATER = ['naga', 'phoenix']
 
 /**
  * A pose is read two ways, blended by `stage`:
@@ -173,43 +173,59 @@ export function createWorld(canvas, options) {
     rig.visible = on
     if (!on) return
 
-    let x = pose.x * halfW
-    let y = pose.y * halfH
-    let fit = actor.freeFit
-    // the open space it may fill: the whole screen, or its box once it rides one
-    let spaceTop = halfH
-    let spaceBottom = -halfH
-    const box = actor.box
-    if (box && pose.stage > 0.001) {
-      let top = box.fixed ? box.top : box.top - window.scrollY
-      let height = box.height
-      if (box.clipTop !== undefined && top < box.clipTop) {
-        // the box is sliding under the header: the creature keeps to what is left of it,
-        // growing smaller with it, and is gone when the box is
-        height = Math.max(0, top + height - box.clipTop)
-        top = box.clipTop
+    const scrollY = window.scrollY
+    // where the creature sits for a given page scroll: free on the stage, or riding its box
+    const frame = (sY) => {
+      let x = pose.x * halfW
+      let y = pose.y * halfH
+      let fit = actor.freeFit
+      // the open space it may fill: the whole screen, or its box once it rides one
+      let spaceTop = halfH
+      let spaceBottom = -halfH
+      const box = actor.box
+      if (box && pose.stage > 0.001) {
+        let top = box.fixed ? box.top : box.top - sY
+        let height = box.height
+        if (box.clipTop !== undefined && top < box.clipTop) {
+          // the box is sliding under the header: the creature keeps to what is left of it,
+          // growing smaller with it, and is gone when the box is
+          height = Math.max(0, top + height - box.clipTop)
+          top = box.clipTop
+        }
+        // the same at the foot of the screen, where the chat button floats
+        if (box.clipBottom !== undefined && top + height > box.clipBottom) height = Math.max(0, box.clipBottom - top)
+        const hw = (box.width / viewW) * halfW
+        const hh = (height / viewH) * halfH
+        // a creature may reach further above its centre than below (raised wings):
+        // fit and centre that whole envelope, so nothing pokes out of the top of the box
+        const up = creature.reach?.up ?? creature.size.y / 2
+        const down = creature.reach?.down ?? creature.size.y / 2
+        // a little air inside the box: springs and a turned body reach past the rest silhouette
+        const boxFit = Math.min((2 * hw * 0.96) / creature.size.x, (2 * hh * 0.9) / (up + down))
+        const bx = (((box.left + box.width / 2) / viewW) * 2 - 1) * halfW + pose.x * hw
+        const by =
+          (1 - ((top + height / 2) / viewH) * 2) * halfH + pose.y * hh - ((up - down) / 2) * boxFit * pose.scale
+        x += (bx - x) * pose.stage
+        y += (by - y) * pose.stage
+        fit += (boxFit - fit) * pose.stage
+        if (pose.stage > 0.5) {
+          spaceTop = (1 - (top / viewH) * 2) * halfH
+          spaceBottom = (1 - ((top + height) / viewH) * 2) * halfH
+        }
       }
-      // the same at the foot of the screen, where the chat button floats
-      if (box.clipBottom !== undefined && top + height > box.clipBottom) height = Math.max(0, box.clipBottom - top)
-      const hw = (box.width / viewW) * halfW
-      const hh = (height / viewH) * halfH
-      // a creature may reach further above its centre than below (raised wings):
-      // fit and centre that whole envelope, so nothing pokes out of the top of the box
-      const up = creature.reach?.up ?? creature.size.y / 2
-      const down = creature.reach?.down ?? creature.size.y / 2
-      // a little air inside the box: springs and a turned body reach past the rest silhouette
-      const boxFit = Math.min((2 * hw * 0.96) / creature.size.x, (2 * hh * 0.9) / (up + down))
-      const bx = (((box.left + box.width / 2) / viewW) * 2 - 1) * halfW + pose.x * hw
-      const by =
-        (1 - ((top + height / 2) / viewH) * 2) * halfH + pose.y * hh - ((up - down) / 2) * boxFit * pose.scale
-      x += (bx - x) * pose.stage
-      y += (by - y) * pose.stage
-      fit += (boxFit - fit) * pose.stage
-      if (pose.stage > 0.5) {
-        spaceTop = (1 - (top / viewH) * 2) * halfH
-        spaceBottom = (1 - ((top + height) / viewH) * 2) * halfH
-      }
+      return { x, y, fit, spaceTop, spaceBottom, box }
     }
+    const { x, y, fit, spaceTop, spaceBottom, box } = frame(scrollY)
+    // the same pose at last frame's scroll: the page carrying the creature is not the creature
+    // flying, so its energy and springs read only this (else every scroll shakes the body)
+    let mx = x
+    let my = y
+    if (box && !box.fixed && pose.stage > 0.001 && actor.lastScrollY !== undefined && actor.lastScrollY !== scrollY) {
+      const held = frame(actor.lastScrollY)
+      mx = held.x
+      my = held.y
+    }
+    actor.lastScrollY = scrollY
 
     if (!actor.dragging) {
       actor.dragYaw += actor.velYaw * dt
@@ -242,7 +258,7 @@ export function createWorld(canvas, options) {
     )
 
     // how hard it is flying: screen speed, quick to rise and slow to settle
-    const speed = dt > 0 ? Math.hypot(x - actor.lastX, y - actor.lastY) / halfH / dt : 0
+    const speed = dt > 0 ? Math.hypot(mx - actor.lastX, my - actor.lastY) / halfH / dt : 0
     const want = Math.min(1, speed * 0.8)
     actor.energy += (want - actor.energy) * (1 - Math.exp(-(want > actor.energy ? 5 : 1.5) * dt))
     // its own velocity and turn rate, in its own size, lightly smoothed: what the springs inside it feel
@@ -250,8 +266,8 @@ export function createWorld(canvas, options) {
       const width = Math.max(1e-6, s * creature.size.x)
       const blend = 1 - Math.exp(-14 * dt)
       const motion = actor.motion
-      motion.vx += ((x - actor.lastX) / width / dt - motion.vx) * blend
-      motion.vy += ((y - actor.lastY) / width / dt - motion.vy) * blend
+      motion.vx += ((mx - actor.lastX) / width / dt - motion.vx) * blend
+      motion.vy += ((my - actor.lastY) / width / dt - motion.vy) * blend
       motion.spin += ((rig.rotation.y - actor.lastYaw) / dt - motion.spin) * blend
     }
     actor.lastX = x

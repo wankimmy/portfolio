@@ -13,7 +13,7 @@ const base = process.argv[2] || 'http://localhost:5173'
 const outDir = path.resolve(process.argv[3] || path.join(here, '..', '.bossku', 'shots', 'chapters'))
 const sizes = (process.argv[4] || '390x844,360x640,1440x900').split(',').map((s) => s.split('x').map(Number))
 const ALL = [
-  'home', 'about', 'encounter-naga', 'tech', 'encounter-whale', 'experience', 'projects',
+  'home', 'about', 'encounter-naga', 'tech', 'experience', 'projects',
   'encounter-phoenix', 'services', 'pricing', 'certificates', 'contact',
 ]
 const chapters = process.argv[5] ? process.argv[5].split(',') : ALL

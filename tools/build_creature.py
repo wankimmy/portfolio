@@ -29,7 +29,7 @@ from mathutils import Vector
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-SCRATCH = Path(r"C:\Users\Admin\AppData\Local\Temp\claude\af71f5d35ee93aee\1123fbff-6548-4fd8-b184-ca05523c0dfc\scratchpad")
+SCRATCH = Path(__import__("tempfile").gettempdir()) / "creature-build"  # previews and bake maps, not the repo
 
 
 def _load(name, file):

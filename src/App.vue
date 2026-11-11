@@ -28,7 +28,6 @@
         <AboutSection />
         <EncounterPlate v-if="encounters" creature="naga" />
         <TechSection />
-        <EncounterPlate v-if="encounters" creature="whale" />
         <ExperienceSection />
         <ProjectsSection />
         <EncounterPlate v-if="encounters" creature="phoenix" />
