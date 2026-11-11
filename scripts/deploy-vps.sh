@@ -3,7 +3,9 @@
 #
 #   DEPLOY_HOST=user@server DEPLOY_KEY=~/.ssh/key bash scripts/deploy-vps.sh
 #
-# Optional: TAG=name (default: UTC timestamp), SKIP_BUILD=1 to ship the dist/ already built.
+# Optional: TAG=name (default: UTC timestamp), SKIP_BUILD=1 to ship the dist/ already built,
+# ACME=1 to keep the certificate setup even if the server's own resolver cannot see the domain yet
+# (a release without it would swap the live certificate for an untrusted one).
 # Releases live in /docker/portfolio/releases/<tag>; the previous image stays on
 # the server, so rollback is:  cd /docker/portfolio && sudo TAG=<old> docker compose -f current/deploy/compose.yml up -d
 set -euo pipefail
@@ -25,7 +27,7 @@ echo "== upload release $TAG"
 tar --exclude=dist/api --exclude=dist/.htaccess -czf - dist nginx.conf deploy | "${SSH[@]}" "sudo mkdir -p $ROOT/releases/$TAG && sudo tar -xzf - -C $ROOT/releases/$TAG"
 
 echo "== build image and switch"
-"${SSH[@]}" "TAG='$TAG' DOMAIN='$DOMAIN' ROOT='$ROOT' bash -s" <<'REMOTE'
+"${SSH[@]}" "TAG='$TAG' DOMAIN='$DOMAIN' ROOT='$ROOT' ACME='${ACME:-0}' bash -s" <<'REMOTE'
 set -euo pipefail
 cd "$ROOT/releases/$TAG"
 sudo docker build -q -t "portfolio-site:$TAG" -f deploy/Dockerfile . >/dev/null
@@ -35,7 +37,10 @@ files=(-f current/deploy/compose.yml)
 # certificate only when the domain already points here (see compose.acme.yml)
 here="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "src") print $(i + 1)}')"
 seen="$(getent ahostsv4 "$DOMAIN" | awk 'NR==1{print $1}')"
-if [ -n "$here" ] && [ "$here" = "$seen" ]; then
+if [ "$ACME" = "1" ]; then
+  files+=(-f current/deploy/compose.acme.yml)
+  echo "certificate enabled (ACME=1)"
+elif [ -n "$here" ] && [ "$here" = "$seen" ]; then
   files+=(-f current/deploy/compose.acme.yml)
   echo "DNS ok: $DOMAIN -> $seen, certificate enabled"
 else

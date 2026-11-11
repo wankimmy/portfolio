@@ -1,5 +1,8 @@
 <template>
   <footer id="contact" class="outro">
+    <!-- open sky above the last call to action: on phones the dragon rides this box (scenes.js) -->
+    <div class="outro__stage" data-stage="contact" aria-hidden="true"></div>
+
     <div class="wrap outro__inner">
       <p class="label">New quest</p>
       <h2 class="outro__title" data-split>Got something in mind? <em>Let's make it real.</em></h2>

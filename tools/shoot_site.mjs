@@ -54,7 +54,7 @@ const og = await browser.newContext({ viewport: { width: 1200, height: 630 }, de
 const page = await og.newPage()
 await page.goto(`${base}/?intro=0`, { waitUntil: 'load' })
 await page.waitForTimeout(9000)
-await page.addStyleTag({ content: '.nav, .chat-widget, .hero__hint, .progress { visibility: hidden !important; }' })
+await page.addStyleTag({ content: '.nav, .chat-widget, .progress { visibility: hidden !important; }' })
 await page.screenshot({ path: path.join(outDir, 'og-cover.jpg'), type: 'jpeg', quality: 84 })
 console.log('og-cover.jpg written')
 await browser.close()

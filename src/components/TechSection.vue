@@ -23,31 +23,19 @@
         </div>
       </div>
     </div>
-
-    <div class="wrap abilities__foot">
-      <button type="button" class="btn btn--line" :aria-pressed="!site.motionOn.value" @click="site.toggleMotion">
-        {{ site.motionOn.value ? 'Pause motion' : 'Resume motion' }}
-      </button>
-    </div>
   </section>
 </template>
 
 <script setup>
-import { inject, onMounted, onUnmounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
 import { skillRows } from '../content.js'
 
-const site = inject('site')
 const sectionRef = ref(null)
 let mm = null
 let loops = []
-
-watch(
-  () => site.motionOn.value,
-  (on) => loops.forEach((loop) => (on ? loop.play() : loop.pause())),
-)
 
 onMounted(() => {
   mm = gsap.matchMedia()
@@ -59,7 +47,7 @@ onMounted(() => {
       return gsap.fromTo(
         track,
         { xPercent: reverse ? -50 : 0 },
-        { xPercent: reverse ? 0 : -50, duration: 46 + index * 8, ease: 'none', repeat: -1, paused: !site.motionOn.value },
+        { xPercent: reverse ? 0 : -50, duration: 46 + index * 8, ease: 'none', repeat: -1 },
       )
     })
 

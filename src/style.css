@@ -650,10 +650,6 @@ main:focus {
   min-height: 44px;
 }
 
-.menu__motion {
-  justify-self: start;
-}
-
 /* ---------- hero ---------------------------------------------------------- */
 
 .hero {
@@ -679,6 +675,7 @@ main:focus {
 .hero__stage {
   position: absolute;
   inset: var(--nav-h) 0 30% 42%;
+  /* the dragon fits itself to this box (scenes.js), so it can never sit under the header */
   /* above the type: where a wing crosses the name, a drag still reaches the dragon */
   z-index: 3;
   display: grid;
@@ -783,18 +780,6 @@ main:focus {
   font-size: clamp(1.05rem, 1.5vw, 1.4rem);
   font-weight: 500;
   letter-spacing: -0.01em;
-}
-
-.hero__hint {
-  position: absolute;
-  top: calc(var(--nav-h) + 12px);
-  right: var(--gutter);
-  z-index: 2;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ink-mute);
 }
 
 /* ---------- status (about) ------------------------------------------------ */
@@ -1005,10 +990,6 @@ main:focus {
   font-style: italic;
   font-weight: 500;
   color: var(--ink-soft);
-}
-
-.abilities__foot {
-  margin-top: clamp(32px, 5vw, 64px);
 }
 
 /* ---------- quest log (experience) --------------------------------------- */
@@ -1485,14 +1466,79 @@ main:focus {
   max-width: 22ch;
 }
 
+/* ---------- encounters: a band of open sky for one creature -------------- */
+
+.encounter {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+  align-items: end;
+  gap: clamp(24px, 4vw, 64px);
+  min-height: 88svh;
+  padding-block: clamp(32px, 6vh, 72px);
+}
+
+.encounter--right {
+  grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+}
+
+/* the creature fits itself to this box (scenes.js) */
+.encounter__stage {
+  align-self: stretch;
+  min-height: 56svh;
+  touch-action: pan-y;
+}
+
+.encounter--left .encounter__stage {
+  order: 1;
+}
+
+.encounter__stage.is-playable {
+  cursor: grab;
+}
+
+.encounter__stage.is-grabbing {
+  cursor: grabbing;
+}
+
+.encounter__caption {
+  display: grid;
+  gap: 0.8rem;
+  padding-bottom: clamp(8px, 3vh, 40px);
+}
+
+.encounter__name {
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 4.6vw, 4.2rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.encounter__role {
+  display: block;
+  margin-top: 0.45em;
+  font-size: 0.42em;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--gold);
+}
+
+.encounter__line {
+  max-width: 26rem;
+  color: var(--ink-soft);
+}
+
 /* ---------- outro (contact) ----------------------------------------------- */
 
 .outro {
   position: relative;
   display: grid;
-  align-content: end;
+  /* open sky first: the row the dragon and its finished world are seen in */
+  grid-template-rows: minmax(46svh, 1fr) auto auto;
   min-height: 100svh;
-  padding: 46svh 0 clamp(20px, 4vh, 40px);
+  padding-bottom: clamp(20px, 4vh, 40px);
 }
 
 .outro::before {
@@ -1501,6 +1547,13 @@ main:focus {
   inset: 40% 0 0 0;
   background: linear-gradient(180deg, rgba(7, 10, 18, 0) 0%, rgba(7, 10, 18, 0.86) 62%, var(--ground) 100%);
   pointer-events: none;
+}
+
+/* wide screens: the copy keeps to the left, so the shade does too and the world on the right stays lit */
+@media (min-width: 721px) {
+  .outro::before {
+    mask-image: linear-gradient(90deg, #000 0%, #000 52%, transparent 78%);
+  }
 }
 
 .outro__inner {
@@ -1615,28 +1668,37 @@ main:focus {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* phone hero: the dragon owns the top half, the copy the bottom */
+  /* phone hero: the dragon gets a row of its own under the header, the copy sits below it */
+  .hero {
+    grid-template-rows: minmax(32svh, 1fr) auto;
+    align-items: stretch;
+    padding-top: var(--nav-h);
+  }
+
   .hero__stage {
-    inset: var(--nav-h) 0 50% 0;
+    position: relative;
+    inset: auto;
   }
 
   .hero__poster {
-    width: 118%;
-    max-width: none;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
 
   .hero::after {
     inset: 34% 0 0 0;
   }
 
-  .hero__hint,
   .chat-widget__hint {
     display: none;
   }
 
+  /* the same facts are one tap away in the menu and in Status: here they cost the dragon its room */
   .hero__stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.9rem 1rem;
+    display: none;
   }
 
   .hero__actions .btn {
@@ -1710,8 +1772,38 @@ main:focus {
     grid-column: 2;
   }
 
+  /* tightened so a strip of sky is still on screen when the page ends */
   .outro {
-    padding-top: 52svh;
+    grid-template-rows: minmax(40svh, 1fr) auto auto;
+    padding-bottom: 12px;
+  }
+
+  .outro__inner {
+    gap: 0.9rem;
+  }
+
+  .outro__title {
+    font-size: 2.1rem;
+  }
+
+  .outro__actions .btn {
+    flex: 1 1 0;
+    padding-inline: 0.8rem;
+  }
+
+  .outro__bottom {
+    margin-top: 20px;
+  }
+
+  .encounter {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(46svh, 1fr) auto;
+    min-height: 78svh;
+  }
+
+  /* phones: always the creature first, its caption under it, like the hero */
+  .encounter .encounter__stage {
+    order: 0;
   }
 }
 
@@ -1729,8 +1821,7 @@ main:focus {
   .progress,
   .nav__chapter,
   .world__canvas,
-  .abilities__foot,
-  .menu__motion {
+  .outro__stage {
     display: none;
   }
 
@@ -1755,6 +1846,7 @@ main:focus {
 
   /* with no dragon to return, the last screen does not need to hold a stage */
   .outro {
+    grid-template-rows: none;
     min-height: 0;
     padding-top: clamp(96px, 13vw, 190px);
   }

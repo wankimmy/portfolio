@@ -14,7 +14,7 @@
               class="log-row__toggle"
               :aria-expanded="openIndex === index"
               :aria-controls="`log-panel-${index}`"
-              @click="toggle(index)"
+              @click="toggle(index, $event)"
             >
               <span class="log-row__period">{{ job.period }}</span>
               <span class="log-row__title">{{ job.title }}</span>
@@ -39,18 +39,20 @@
 </template>
 
 <script setup>
-import { nextTick, ref } from 'vue'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { inject, ref } from 'vue'
 
 import { experience } from '../content.js'
+
+const site = inject('site')
 
 // the current role starts open; one row open at a time keeps the list scannable
 const openIndex = ref(0)
 
-const toggle = async (index) => {
-  openIndex.value = openIndex.value === index ? -1 : index
-  // the page just changed height: every trigger below this row has moved
-  await nextTick()
-  ScrollTrigger.refresh()
+// Opening a row closes the one above it, which would pull the row you just
+// pressed up and off the screen: the page holds that row still instead.
+const toggle = (index, event) => {
+  site.reflow(event.currentTarget.closest('.log-row'), () => {
+    openIndex.value = openIndex.value === index ? -1 : index
+  })
 }
 </script>

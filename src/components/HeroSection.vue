@@ -1,7 +1,7 @@
 <template>
   <section id="home" ref="sectionRef" class="hero" aria-label="Intro">
-    <!-- the dragon's handle: drag here to spin it. Pointer-only extra. -->
-    <div ref="stageRef" class="hero__stage" :class="{ 'is-playable': worldReady }" aria-hidden="true">
+    <!-- the dragon's box (scenes.js) and its handle: drag here to spin it. Pointer-only extra. -->
+    <div ref="stageRef" class="hero__stage" :class="{ 'is-playable': worldReady }" data-stage="home" aria-hidden="true">
       <img
         class="hero__poster"
         :class="{ 'is-hidden': worldReady }"
@@ -58,8 +58,6 @@
         </div>
       </dl>
     </div>
-
-    <p v-if="worldReady" class="hero__hint" aria-hidden="true">Drag to spin the dragon</p>
   </section>
 </template>
 
@@ -134,7 +132,7 @@ watch(
   () => props.worldReady,
   (ready) => {
     unbindDrag()
-    unbindDrag = ready && stageRef.value ? site.bindDragonDrag(stageRef.value) : () => {}
+    unbindDrag = ready && stageRef.value ? site.bindDrag(stageRef.value, 'dragon') : () => {}
   },
 )
 

@@ -340,6 +340,35 @@ export const certificates = [
 ]
 
 /** Chapters in page order: id, the pause-menu name, and the plain name beside it. */
+/**
+ * The creatures that share the sky with the dragon. Each gets a band of its
+ * own before the chapter it belongs to (EncounterPlate.vue). `side` is where
+ * the caption sits on wide screens.
+ */
+export const bestiary = {
+  naga: {
+    no: '01',
+    name: 'Naga',
+    role: 'Keeper of the forge',
+    line: 'It guards the weapons in the next room. Nine years of them.',
+    side: 'left',
+  },
+  whale: {
+    no: '02',
+    name: 'Sky whale',
+    role: 'Carrier of the log',
+    line: 'It carries the whole quest log on its back, and it is in no hurry.',
+    side: 'right',
+  },
+  phoenix: {
+    no: '03',
+    name: 'Phoenix',
+    role: 'Patron of the workshop',
+    line: 'Things come here to be built, or rebuilt. It watches over both.',
+    side: 'left',
+  },
+}
+
 export const chapters = [
   { id: 'home', menu: 'Title screen', plain: 'Intro' },
   { id: 'about', menu: 'Status', plain: 'About' },

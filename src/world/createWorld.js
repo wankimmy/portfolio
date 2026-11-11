@@ -1,15 +1,15 @@
 /**
- * The night sky, the dragon and the crystal swarm, as one full-viewport WebGL
- * layer behind the page.
+ * The night sky, its creatures and the crystal swarm, as one full-viewport
+ * WebGL layer behind the page.
  *
- * The page never talks to three.js directly. It tweens `pose` (where the
- * dragon sits, in screen terms) with GSAP and feeds scroll progress in; this
- * module reads those every tick of GSAP's ticker, the same clock that drives
- * Lenis and ScrollTrigger.
+ * The page never talks to three.js directly. Every creature is an actor with a
+ * `pose` the page tweens with GSAP (see scenes.js); this module reads the poses
+ * every tick of GSAP's ticker, the same clock that drives Lenis and
+ * ScrollTrigger.
  */
 import gsap from 'gsap'
 
-import { applyHideMaterials, createEnvironment, createLightRig } from './dragonLook.js'
+import { createEnvironment, createLightRig } from './dragonLook.js'
 import { buildFormations } from './formations.js'
 
 const CAMERA_Z = 8
@@ -19,7 +19,40 @@ const TAU = Math.PI * 2
 const DRAG_SPEED = 0.0075 // rad per px
 const PITCH_LIMIT = 1.1
 const FLICK_FRICTION = 2.6
-const REST_AFTER_S = 1.4 // a spun dragon turns back to its perch after this long
+const REST_AFTER_S = 1.4 // a spun creature turns back to its pose after this long
+
+/** Every creature is its own lazy chunk: creatures/<name>.js exporting createCreature. */
+const MODULES = import.meta.glob('./creatures/*.js')
+const load = (name) => MODULES[`./creatures/${name}.js`]
+
+/** The dragon loads first and opens the page. These are built in code once it is on screen. */
+const LATER = ['naga', 'whale', 'phoenix']
+
+/**
+ * A pose is read two ways, blended by `stage`:
+ *   stage 0  free flight. x, y: centre in half-viewports, (0, 0) the middle of
+ *            the screen, +y up. scale 1 = fitted to the screen.
+ *   stage 1  riding a box on the page (see setBox). x, y: in half-boxes from
+ *            the box centre. scale 1 = fitted to the box.
+ * yaw + turns the creature toward screen right. show 0 = parked: not drawn.
+ */
+const makeActor = (name) => ({
+  name,
+  pose: { x: 0, y: 2, scale: 1, yaw: 0, pitch: 0, roll: 0, stage: 0, show: 0 },
+  box: null,
+  rig: null,
+  creature: null,
+  freeFit: 1,
+  energy: 0,
+  lastX: 0,
+  lastY: 0,
+  dragYaw: 0,
+  dragPitch: 0,
+  velYaw: 0,
+  velPitch: 0,
+  dragging: false,
+  lastDragTime: -Infinity,
+})
 
 /**
  * @param {HTMLCanvasElement} canvas
@@ -29,36 +62,35 @@ const REST_AFTER_S = 1.4 // a spun dragon turns back to its perch after this lon
  *   onProgress?: (ratio: number) => void,
  *   onReady?: () => void,
  *   onError?: (err: unknown) => void,
- * }} options lite = phone build: smaller model, no bloom, cheaper material
+ * }} options lite = phone build: smaller models, no bloom, cheaper materials
  */
 export function createWorld(canvas, options) {
   const { lite = false, modelUrl, onProgress = () => {}, onReady = () => {}, onError = () => {} } = options
 
-  /** x, y: dragon centre in half-viewports (-1..1). scale 1 = hero size. Angles in radians. */
-  const pose = { x: 0, y: 0, scale: 1, yaw: 0, pitch: 0, roll: 0 }
+  const actors = { dragon: makeActor('dragon') }
+  for (const name of LATER) actors[name] = makeActor(name)
+  const cast = Object.values(actors)
 
   let THREE = null
   let renderer = null
   let scene = null
   let camera = null
   let composer = null
-  let rig = null
   let lights = null
-  let mixer = null
+  let envMap = null
   let starGroup = null
   let starLayers = []
   let disposeEnv = null
-  let modelSize = null
   let resizeObserver = null
 
   let disposed = false
   let ready = false
   let visible = true
-  let flapping = true
 
+  let viewW = 1
+  let viewH = 1
   let halfW = 1
   let halfH = 1
-  let baseScale = 1
   let shadowScale = 0
 
   let scrollProgress = 0
@@ -77,48 +109,114 @@ export function createWorld(canvas, options) {
   let swarmFrom = null
   let sizeNow = 1
   let sizeFrom = 1
-  let formation = { shape: 'drift', x: 0, y: 0, spin: 0, spread: 1, size: 1 }
+  let formation = { shape: 'drift', x: 0, y: 0, z: 0, spin: 0, spread: 1, size: 1, follow: null }
   let formationAngle = 0
 
   let hoverX = 0
   let hoverY = 0
   let easedHoverX = 0
   let easedHoverY = 0
-
-  let dragYaw = 0
-  let dragPitch = 0
-  let velYaw = 0
-  let velPitch = 0
-  let dragging = false
-  let lastDragTime = -Infinity
-  let clock = 0
   let starDrift = 0
+  let clock = 0
 
   // frame-time watch: drop the bloom pass on machines that cannot hold it
   let sampled = 0
   let sampledMs = 0
 
-  const measure = () => {
-    if (!renderer || !camera) return
-    const w = Math.max(1, canvas.clientWidth)
-    const h = Math.max(1, canvas.clientHeight)
-    renderer.setSize(w, h, false)
-    composer?.setSize(w, h)
-    camera.aspect = w / h
-    camera.updateProjectionMatrix()
-    halfH = Math.tan((FOV * Math.PI) / 360) * CAMERA_Z
-    halfW = halfH * camera.aspect
-    if (!modelSize) return
-    // Portrait screens let the wings run off the sides so the body stays big;
+  const fitFree = (actor) => {
+    if (!actor.creature) return
+    // Portrait screens let wings run off the sides so the body stays big;
     // landscape keeps the whole animal inside the right half of the stage.
     const portrait = camera.aspect < 0.8
     const widthShare = portrait ? 1.12 : 0.6
     const heightShare = portrait ? 0.44 : 0.84
-    const flapHeadroom = 1.35 // the rest pose is shorter than the raised-wing pose
-    baseScale = Math.min(
-      (2 * halfW * widthShare) / modelSize.x,
-      (2 * halfH * heightShare) / (modelSize.y * flapHeadroom),
+    actor.freeFit = Math.min(
+      (2 * halfW * widthShare) / actor.creature.size.x,
+      (2 * halfH * heightShare) / actor.creature.size.y,
     )
+  }
+
+  const measure = () => {
+    if (!renderer || !camera) return
+    viewW = Math.max(1, canvas.clientWidth)
+    viewH = Math.max(1, canvas.clientHeight)
+    renderer.setSize(viewW, viewH, false)
+    composer?.setSize(viewW, viewH)
+    camera.aspect = viewW / viewH
+    camera.updateProjectionMatrix()
+    halfH = Math.tan((FOV * Math.PI) / 360) * CAMERA_Z
+    halfW = halfH * camera.aspect
+    cast.forEach(fitFree)
+  }
+
+  const place = (actor, time, dt) => {
+    const { pose, rig, creature } = actor
+    if (!rig) return
+    const on = pose.show > 0
+    rig.visible = on
+    if (!on) return
+
+    let x = pose.x * halfW
+    let y = pose.y * halfH
+    let fit = actor.freeFit
+    const box = actor.box
+    if (box && pose.stage > 0.001) {
+      let top = box.fixed ? box.top : box.top - window.scrollY
+      let height = box.height
+      if (box.clipTop !== undefined && top < box.clipTop) {
+        // the box is sliding under the header: the creature keeps to what is left of it
+        height = Math.max(box.minHeight ?? 120, top + height - box.clipTop)
+        top = box.clipTop
+      }
+      const hw = (box.width / viewW) * halfW
+      const hh = (height / viewH) * halfH
+      const bx = (((box.left + box.width / 2) / viewW) * 2 - 1) * halfW + pose.x * hw
+      const by = (1 - ((top + height / 2) / viewH) * 2) * halfH + pose.y * hh
+      const boxFit = Math.min((2 * hw) / creature.size.x, (2 * hh) / creature.size.y)
+      x += (bx - x) * pose.stage
+      y += (by - y) * pose.stage
+      fit += (boxFit - fit) * pose.stage
+    }
+
+    if (!actor.dragging) {
+      actor.dragYaw += actor.velYaw * dt
+      actor.dragPitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, actor.dragPitch + actor.velPitch * dt))
+      const decay = Math.exp(-FLICK_FRICTION * dt)
+      actor.velYaw *= decay
+      actor.velPitch *= decay
+      if (time - actor.lastDragTime > REST_AFTER_S) {
+        const back = 1 - Math.exp(-1.8 * dt)
+        const restYaw = Math.round(actor.dragYaw / TAU) * TAU // nearest full turn, never unwinds
+        actor.dragYaw += (restYaw - actor.dragYaw) * back
+        actor.dragPitch -= actor.dragPitch * back
+      }
+    }
+
+    const s = fit * pose.scale
+    rig.position.set(x, y, 0)
+    rig.scale.setScalar(s)
+    rig.rotation.set(
+      pose.pitch + easedHoverY * 0.07 + actor.dragPitch + bank * 0.2,
+      pose.yaw + easedHoverX * 0.12 + actor.dragYaw,
+      pose.roll - bank * 0.05,
+    )
+
+    // how hard it is flying: screen speed, quick to rise and slow to settle
+    const speed = dt > 0 ? Math.hypot(x - actor.lastX, y - actor.lastY) / halfH / dt : 0
+    actor.lastX = x
+    actor.lastY = y
+    const want = Math.min(1, speed * 0.8)
+    actor.energy += (want - actor.energy) * (1 - Math.exp(-(want > actor.energy ? 5 : 1.5) * dt))
+    creature.update(time, dt, actor.energy)
+
+    if (actor === actors.dragon) {
+      lights.group.position.copy(rig.position)
+      lights.group.scale.setScalar(s)
+      if (Math.abs(s - shadowScale) > shadowScale * 0.02) {
+        shadowScale = s
+        lights.fitShadow(s)
+      }
+    }
   }
 
   const tick = (time, deltaMs) => {
@@ -126,52 +224,19 @@ export function createWorld(canvas, options) {
     const dt = Math.min(deltaMs / 1000, 0.05)
     clock = time
 
-    if (flapping) mixer.update(dt)
-
     const follow = 1 - Math.exp(-6 * dt)
     easedHoverX += (hoverX - easedHoverX) * follow
     easedHoverY += (hoverY - easedHoverY) * follow
     bank += (scrollVelocity - bank) * (1 - Math.exp(-5 * dt))
 
-    if (!dragging) {
-      dragYaw += velYaw * dt
-      dragPitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, dragPitch + velPitch * dt))
-      const decay = Math.exp(-FLICK_FRICTION * dt)
-      velYaw *= decay
-      velPitch *= decay
-      if (time - lastDragTime > REST_AFTER_S) {
-        const back = 1 - Math.exp(-1.8 * dt)
-        const restYaw = Math.round(dragYaw / TAU) * TAU // nearest full turn, never unwinds
-        dragYaw += (restYaw - dragYaw) * back
-        dragPitch -= dragPitch * back
-      }
-    }
-
-    const s = baseScale * pose.scale
-    rig.position.set(pose.x * halfW, pose.y * halfH, 0)
-    rig.scale.setScalar(s)
-    rig.rotation.set(
-      pose.pitch + easedHoverY * 0.07 + dragPitch + bank * 0.2,
-      pose.yaw + easedHoverX * 0.12 + dragYaw,
-      pose.roll - bank * 0.05,
-    )
-
-    lights.group.position.copy(rig.position)
-    lights.group.scale.setScalar(s)
-    if (Math.abs(s - shadowScale) > shadowScale * 0.02) {
-      shadowScale = s
-      lights.fitShadow(s)
-    }
-
+    for (const actor of cast) place(actor, time, dt)
     drawSwarm(time, dt)
 
     starGroup.position.y = scrollProgress * 2.4
-    if (flapping) {
-      starDrift += dt * 0.003
-      starGroup.rotation.z = starDrift
-      starLayers[0].material.opacity = 0.78 + 0.22 * Math.sin(time * 0.9)
-      starLayers[1].material.opacity = 0.78 - 0.22 * Math.sin(time * 0.9)
-    }
+    starDrift += dt * 0.003
+    starGroup.rotation.z = starDrift
+    starLayers[0].material.opacity = 0.78 + 0.22 * Math.sin(time * 0.9)
+    starLayers[1].material.opacity = 0.78 - 0.22 * Math.sin(time * 0.9)
 
     if (composer) {
       composer.render(dt)
@@ -197,11 +262,15 @@ export function createWorld(canvas, options) {
   }
 
   /**
-   * Let an element act as the dragon's handle: drag spins it, a flick keeps it
+   * Let an element act as a creature's handle: drag spins it, a flick keeps it
    * turning, double-click snaps it back. Vertical touch scroll passes through.
+   * @param {HTMLElement} el
+   * @param {string} [name] which actor
    * @returns {() => void} unbind
    */
-  const bindDrag = (el) => {
+  const bindDrag = (el, name = 'dragon') => {
+    const actor = actors[name]
+    if (!actor) return () => {}
     let pointerId = null
     let lastX = 0
     let lastY = 0
@@ -209,40 +278,40 @@ export function createWorld(canvas, options) {
 
     const down = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return
-      dragging = true
+      actor.dragging = true
       pointerId = e.pointerId
       lastX = e.clientX
       lastY = e.clientY
       lastT = e.timeStamp
-      velYaw = 0
-      velPitch = 0
+      actor.velYaw = 0
+      actor.velPitch = 0
       el.setPointerCapture?.(e.pointerId)
       el.classList.add('is-grabbing')
     }
     const move = (e) => {
-      if (!dragging || e.pointerId !== pointerId) return
+      if (!actor.dragging || e.pointerId !== pointerId) return
       const dx = (e.clientX - lastX) * DRAG_SPEED
       const dy = (e.clientY - lastY) * DRAG_SPEED
       const dt = Math.max(1, e.timeStamp - lastT) / 1000
-      dragYaw += dx
-      dragPitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, dragPitch + dy))
-      velYaw = dx / dt
-      velPitch = dy / dt
+      actor.dragYaw += dx
+      actor.dragPitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, actor.dragPitch + dy))
+      actor.velYaw = dx / dt
+      actor.velPitch = dy / dt
       lastX = e.clientX
       lastY = e.clientY
       lastT = e.timeStamp
     }
     const up = (e) => {
       if (e.pointerId !== pointerId) return
-      dragging = false
+      actor.dragging = false
       pointerId = null
-      lastDragTime = clock
+      actor.lastDragTime = clock
       el.classList.remove('is-grabbing')
     }
     const reset = () => {
-      velYaw = 0
-      velPitch = 0
-      lastDragTime = -Infinity
+      actor.velYaw = 0
+      actor.velPitch = 0
+      actor.lastDragTime = -Infinity
     }
 
     el.addEventListener('pointerdown', down)
@@ -256,7 +325,8 @@ export function createWorld(canvas, options) {
       el.removeEventListener('pointerup', up)
       el.removeEventListener('pointercancel', up)
       el.removeEventListener('dblclick', reset)
-      dragging = false
+      el.classList.remove('is-grabbing')
+      if (pointerId !== null) actor.dragging = false
     }
   }
 
@@ -354,7 +424,7 @@ export function createWorld(canvas, options) {
     return x - Math.floor(x)
   }
 
-  const buildSwarm = (envMap) => {
+  const buildSwarm = () => {
     const geometry = new THREE.OctahedronGeometry(1, 0)
     geometry.scale(0.5, 1, 0.5) // a shard, not a die
     const material = new THREE.MeshPhysicalMaterial({
@@ -404,13 +474,22 @@ export function createWorld(canvas, options) {
   }
 
   const drawSwarm = (time, dt) => {
-    if (flapping) formationAngle += formation.spin * dt
+    formationAngle += formation.spin * dt
     const cos = Math.cos(formationAngle)
     const sin = Math.sin(formationAngle)
     const offsets = formations[formation.shape]
-    const reach = halfH * formation.spread
-    const ax = formation.x * halfW
-    const ay = formation.y * halfH
+    let reach = halfH * formation.spread
+    let ax = formation.x * halfW
+    let ay = formation.y * halfH
+    const lead = formation.follow ? actors[formation.follow] : null
+    if (lead?.rig) {
+      // anchored to a creature: the shape goes where it goes, sized against it
+      const s = lead.rig.scale.x
+      reach = s * lead.creature.size.y * formation.spread
+      ax = lead.rig.position.x + formation.x * s * lead.creature.size.x * 0.5
+      ay = lead.rig.position.y + formation.y * s * lead.creature.size.y * 0.5
+    }
+    const az = formation.z * reach
     sizeNow = sizeFrom + (formation.size - sizeFrom) * morph.t
 
     for (let i = 0; i < CRYSTALS; i += 1) {
@@ -420,7 +499,7 @@ export function createWorld(canvas, options) {
       const oz = offsets[j + 2]
       const tx = ax + (ox * cos + oz * sin) * reach
       const ty = ay + offsets[j + 1] * reach + Math.sin(time * 0.6 + i) * 0.012 * halfH
-      const tz = (oz * cos - ox * sin) * reach
+      const tz = az + (oz * cos - ox * sin) * reach
 
       // each crystal leaves a little after the one before it, so a morph ripples
       const lead = Math.min(1, Math.max(0, morph.t * 1.45 - (i / CRYSTALS) * 0.45))
@@ -432,9 +511,8 @@ export function createWorld(canvas, options) {
       swarmNow[j + 1] = y
       swarmNow[j + 2] = z
 
-      const turn = flapping ? time : 0
       dummy.position.set(x, y, z)
-      dummy.rotation.set(i * 1.3 + turn * (0.2 + noise(i, 2) * 0.5), i * 2.1 + turn * (0.15 + noise(i, 3) * 0.4), 0)
+      dummy.rotation.set(i * 1.3 + time * (0.2 + noise(i, 2) * 0.5), i * 2.1 + time * (0.15 + noise(i, 3) * 0.4), 0)
       dummy.scale.setScalar(halfH * 0.03 * (0.55 + noise(i, 4) * 0.9) * sizeNow)
       dummy.updateMatrix()
       swarm.setMatrixAt(i, dummy.matrix)
@@ -443,9 +521,9 @@ export function createWorld(canvas, options) {
 
     sigil.visible = sigilShow.k > 0.001
     if (sigil.visible) {
-      sigil.position.set(ax, ay, 0)
-      sigil.scale.setScalar(halfH * 0.17 * formation.spread * sigilShow.k)
-      if (flapping) sigil.rotation.y += dt * 0.5
+      sigil.position.set(ax, ay, az)
+      sigil.scale.setScalar(reach * 0.17 * sigilShow.k)
+      sigil.rotation.y += dt * 0.5
     }
   }
 
@@ -459,9 +537,44 @@ export function createWorld(canvas, options) {
     const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 })
     composer = new EffectComposer(renderer, target)
     composer.addPass(new RenderPass(scene, camera))
-    // high threshold: only the eyes and the hottest glints on the scales bleed
+    // high threshold: only the eyes and the hottest glints bleed
     composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.36, 0.6, 1.3))
     composer.addPass(new OutputPass())
+  }
+
+  /** Put a built creature on the stage, parked until the page calls for it. */
+  const enlist = (actor, creature) => {
+    const rig = new THREE.Group()
+    rig.rotation.order = 'YXZ'
+    rig.add(creature.group)
+    rig.visible = false
+    scene.add(rig)
+    actor.creature = creature
+    actor.rig = rig
+    fitFree(actor)
+  }
+
+  /** Build the code-made creatures one at a time, between frames, without holding up the page. */
+  const buildLater = async () => {
+    for (const name of LATER) {
+      await new Promise((resolve) => setTimeout(resolve, 120))
+      if (disposed) return
+      try {
+        if (!load(name)) continue
+        const { createCreature } = await load(name)()
+        const creature = await createCreature(THREE, { envMap, lite })
+        if (disposed) return creature.dispose?.()
+        enlist(actors[name], creature)
+        // compile its shaders now, so its first appearance does not stutter
+        const rig = actors[name].rig
+        rig.visible = true
+        await renderer.compileAsync(rig, camera, scene).catch(() => {})
+        rig.visible = actors[name].pose.show > 0
+      } catch (err) {
+        // the page reads the same without it: its band simply stays empty sky
+        console.warn(`[world] ${name} could not be built`, err)
+      }
+    }
   }
 
   const disposeTree = (object) => {
@@ -483,7 +596,7 @@ export function createWorld(canvas, options) {
     gsap.ticker.remove(tick)
     window.removeEventListener('pointermove', onWindowPointerMove)
     resizeObserver?.disconnect()
-    mixer?.stopAllAction()
+    for (const actor of cast) actor.creature?.dispose?.()
     if (scene) disposeTree(scene)
     scene?.background?.dispose?.()
     disposeEnv?.()
@@ -493,11 +606,7 @@ export function createWorld(canvas, options) {
 
   const start = async () => {
     try {
-      const [three, { GLTFLoader }, { DRACOLoader }] = await Promise.all([
-        import('three'),
-        import('three/examples/jsm/loaders/GLTFLoader.js'),
-        import('three/examples/jsm/loaders/DRACOLoader.js'),
-      ])
+      const [three, { createCreature: createDragon }] = await Promise.all([import('three'), load('dragon')()])
       if (disposed) return
       THREE = three
 
@@ -523,48 +632,14 @@ export function createWorld(canvas, options) {
       const env = await createEnvironment(renderer, THREE)
       if (disposed) return env.dispose()
       disposeEnv = env.dispose
+      envMap = env.envMap
 
-      const draco = new DRACOLoader()
-      draco.setDecoderPath('/draco/')
-      const loader = new GLTFLoader()
-      loader.setDRACOLoader(draco)
-      const gltf = await new Promise((resolve, reject) => {
-        loader.load(
-          modelUrl,
-          resolve,
-          (e) => {
-            if (e.lengthComputable && e.total > 0) onProgress(Math.min(1, e.loaded / e.total))
-          },
-          reject,
-        )
-      })
-      draco.dispose()
+      const dragon = await createDragon(THREE, { envMap, lite, modelUrl, onProgress })
       if (disposed) return
+      measure()
+      enlist(actors.dragon, dragon)
 
-      const model = gltf.scene
-      applyHideMaterials(model, THREE, { envMap: env.envMap, lite })
-      // Rest-pose bounds only: Box3.setFromObject also swallows every morph
-      // target, which inflates the box by the whole flap and shrinks the fit.
-      model.updateMatrixWorld(true)
-      const box = new THREE.Box3()
-      const part = new THREE.Box3()
-      model.traverse((child) => {
-        if (!child.isMesh) return
-        part.setFromBufferAttribute(child.geometry.attributes.position).applyMatrix4(child.matrixWorld)
-        box.union(part)
-      })
-      modelSize = box.getSize(new THREE.Vector3())
-      model.position.sub(box.getCenter(new THREE.Vector3()))
-      rig = new THREE.Group()
-      rig.rotation.order = 'YXZ'
-      rig.add(model)
-      scene.add(rig)
-
-      // baked flight cycle: wing flap, body bob, tail sway
-      mixer = new THREE.AnimationMixer(model)
-      if (gltf.animations.length) mixer.clipAction(gltf.animations[0]).play()
-
-      buildSwarm(env.envMap)
+      buildSwarm()
       if (!lite) await buildBloom()
       if (disposed) return
 
@@ -580,6 +655,7 @@ export function createWorld(canvas, options) {
       gsap.ticker.add(tick)
       onProgress(1)
       onReady()
+      buildLater()
     } catch (err) {
       onError(err)
       dispose()
@@ -589,9 +665,20 @@ export function createWorld(canvas, options) {
   start()
 
   return {
-    pose,
+    /** name -> { pose }: tween the pose, the world follows. */
+    actors,
     bindDrag,
     dispose,
+    /**
+     * Give an actor a box on the page to ride while its pose.stage is above 0.
+     * @param {string} name
+     * @param {{ left: number, top: number, width: number, height: number, fixed?: boolean, clipTop?: number, minHeight?: number }} box
+     *   px. top is measured from the top of the document, or of the screen when fixed is set.
+     *   clipTop: the creature stays below this screen line as the box scrolls up under it.
+     */
+    setBox(name, box) {
+      if (actors[name]) actors[name].box = box
+    },
     /** @param {number} progress 0..1 down the page  @param {number} velocity -1..1, sign = direction */
     setScroll(progress, velocity) {
       scrollProgress = progress
@@ -600,10 +687,10 @@ export function createWorld(canvas, options) {
     /**
      * Morph the crystal swarm into a chapter's shape (see formations.js).
      * Safe to call mid-morph: it always starts from where the crystals are now.
-     * @param {{ shape: string, x: number, y: number, spin?: number, spread?: number, size?: number }} next
+     * @param {{ shape: string, x: number, y: number, z?: number, spin?: number, spread?: number, size?: number, follow?: string }} next
      */
     setFormation(next, duration = 2) {
-      const target = { spin: 0, spread: 1, size: 1, ...next }
+      const target = { z: 0, spin: 0, spread: 1, size: 1, follow: null, ...next }
       if (!ready) {
         formation = target
         return
@@ -620,10 +707,6 @@ export function createWorld(canvas, options) {
         ease: 'expo.out',
         overwrite: true,
       })
-    },
-    /** Pause the flap, the crystal spin and the star twinkle (the page's motion switch). */
-    setFlapping(on) {
-      flapping = on
     },
     /** Stop rendering while nothing of the layer can be seen. */
     setVisible(on) {

@@ -10,7 +10,7 @@
       @enter="enter"
     />
 
-    <!-- Night sky and dragon. The CSS sky on .world shows until WebGL is live. -->
+    <!-- Night sky and its creatures. The CSS sky on .world shows until WebGL is live. -->
     <div ref="worldRef" class="world" :class="{ 'is-live': worldReady }" aria-hidden="true">
       <canvas ref="canvasRef" class="world__canvas"></canvas>
       <div class="world__veil"></div>
@@ -22,12 +22,16 @@
     <div class="app__page" :inert="titleOpen">
       <SiteNav :active="activeId" />
 
+      <!-- An encounter is a band of open sky for one creature: without the live sky it has nothing to show. -->
       <main id="main" tabindex="-1">
         <HeroSection :world-ready="worldReady" :entered="entered" />
         <AboutSection />
+        <EncounterPlate v-if="encounters" creature="naga" />
         <TechSection />
+        <EncounterPlate v-if="encounters" creature="whale" />
         <ExperienceSection />
         <ProjectsSection />
+        <EncounterPlate v-if="encounters" creature="phoenix" />
         <ServicesSection />
         <PricingSection />
         <CertificatesSection />
@@ -42,7 +46,7 @@
 </template>
 
 <script setup>
-import { nextTick, onMounted, onUnmounted, provide, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
@@ -51,11 +55,12 @@ import { chapters } from './content.js'
 import { buildReveals } from './motion/reveals.js'
 import { createWorld } from './world/createWorld.js'
 import { FORMATIONS } from './world/formations.js'
-import { ENTRANCE, PERCHES } from './world/perches.js'
+import { isEncounter, PARK, SCENE_IDS, SCENES } from './world/scenes.js'
 import TitleScreen from './components/TitleScreen.vue'
 import SiteNav from './components/SiteNav.vue'
 import HeroSection from './components/HeroSection.vue'
 import AboutSection from './components/AboutSection.vue'
+import EncounterPlate from './components/EncounterPlate.vue'
 import TechSection from './components/TechSection.vue'
 import ExperienceSection from './components/ExperienceSection.vue'
 import ProjectsSection from './components/ProjectsSection.vue'
@@ -67,7 +72,10 @@ import SiteFooter from './components/SiteFooter.vue'
 import ChatWidget from './components/ChatWidget.vue'
 
 const ENTERED_KEY = 'sh-entered'
-const MODEL_VERSION = 'v8'
+const MODEL_VERSION = 'v9'
+const READING_LINE = 0.55 // the scene whose top has passed this far down the screen is the one on stage
+const ENCOUNTER_LEAD = 0.3 // an encounter starts this much of a screen early, so its creature is there to meet you
+const CHAPTER_IDS = new Set(chapters.map((c) => c.id))
 
 const appRef = ref(null)
 const worldRef = ref(null)
@@ -78,9 +86,11 @@ const titleOpen = ref(false)
 const entered = ref(false)
 const worldReady = ref(false)
 const worldFailed = ref(false)
+const motionOk = ref(false)
 const loadProgress = ref(0)
 const activeId = ref('home')
-const motionOn = ref(true)
+
+const encounters = computed(() => motionOk.value && !worldFailed.value)
 
 let reduceQuery = null
 let scroll = null
@@ -89,49 +99,125 @@ let motionCtx = null
 let entrancePlayed = false
 let wasTall = false
 
-const isTall = () => window.innerWidth / window.innerHeight < 0.8
-const perchFor = (id) => PERCHES[isTall() ? 'tall' : 'wide'][id] ?? PERCHES.wide.home
+let marks = [] // scenes found on the page, top to bottom: { id, chapter, top }
+let boxes = {} // scene id -> the box on the page its creature rides
+let sceneId = 'home'
+
+/** Phones and any window too narrow or too upright to share a row with a creature. */
+const isTall = () => window.innerWidth <= 720 || window.innerWidth / window.innerHeight < 0.8
+const sceneFor = (id) => SCENES[isTall() ? 'tall' : 'wide'][id] ?? SCENES.wide.home
 const formationFor = (id) => {
   const { tall, ...wide } = FORMATIONS[id] ?? FORMATIONS.home
   return isTall() ? { ...wide, ...tall } : wide
 }
+const navHeight = () => document.querySelector('.nav')?.offsetHeight ?? 64
 
-/** Send the dragon to a chapter's perch and dim the sky to that chapter's level. */
-const flyTo = (id, duration = 1.6) => {
-  const { veil, ...pose } = perchFor(id)
+/** Put a scene on stage: its creatures fly in, the others leave, the sky dims to its level. */
+const setScene = (id, duration = 1.6) => {
+  const { veil, cast } = sceneFor(id)
   if (worldRef.value) {
     gsap.to(worldRef.value, { '--veil': veil, duration: Math.min(duration, 0.9), ease: 'power2.out', overwrite: 'auto' })
   }
   if (!world) return
-  // The star map runs its own canvas: once the dragon has flown off the top,
-  // stop rendering so two heavy scenes never draw at once.
+  // The star map runs its own canvas: once everyone has left the sky, stop
+  // rendering so two heavy scenes never draw at once.
   const resting = id === 'star-map'
   if (!resting) world.setVisible(true)
   world.setFormation(formationFor(id), duration > 0 ? 2 : 0)
-  gsap.to(world.pose, {
-    ...pose,
-    duration,
-    ease: 'expo.out',
-    overwrite: 'auto',
-    onComplete: () => resting && world?.setVisible(false),
+
+  for (const [name, actor] of Object.entries(world.actors)) {
+    const role = cast[name]
+    if (role) {
+      const { box, ...pose } = role
+      const rides = Boolean(box && boxes[id])
+      if (rides) world.setBox(name, boxes[id])
+      actor.pose.show = 1
+      gsap.to(actor.pose, { ...pose, stage: rides ? 1 : 0, duration, ease: 'expo.out', overwrite: true })
+    } else if (actor.pose.show > 0) {
+      gsap.to(actor.pose, {
+        ...PARK[name],
+        stage: 0,
+        duration: Math.min(duration, 1.2),
+        ease: 'power2.in',
+        overwrite: true,
+        onComplete: () => {
+          actor.pose.show = 0
+        },
+      })
+    }
+  }
+  if (resting) gsap.delayedCall(Math.min(duration, 1.2) + 0.1, () => sceneId === 'star-map' && world?.setVisible(false))
+}
+
+/** Where every scene starts and where the creature boxes sit, in document pixels. */
+const measureStages = () => {
+  const y = window.scrollY
+  const top = (el) => el.getBoundingClientRect().top + y
+
+  marks = SCENE_IDS.map((id) => document.getElementById(id))
+    .filter((el) => el && el.getClientRects().length)
+    .map((el) => ({ id: el.id, chapter: el.id, top: top(el) }))
+  // an encounter introduces the chapter after it, so the header already names that one
+  let next = marks.at(-1)?.id ?? 'home'
+  for (let i = marks.length - 1; i >= 0; i -= 1) {
+    if (CHAPTER_IDS.has(marks[i].id)) next = marks[i].id
+    else marks[i].chapter = next
+  }
+
+  boxes = {}
+  document.querySelectorAll('[data-stage]').forEach((el) => {
+    const rect = el.getBoundingClientRect()
+    if (rect.width < 1 || rect.height < 1) return
+    const id = el.dataset.stage
+    boxes[id] = { left: rect.left, top: rect.top + y, width: rect.width, height: rect.height }
+    // the hero box is the first screen: its dragon holds that spot while the copy scrolls away
+    if (id === 'home') boxes[id].fixed = true
+    // the last box slides up under the header as the page ends: the dragon keeps below it
+    if (id === 'contact') Object.assign(boxes[id], { clipTop: navHeight() + 8, minHeight: 110 })
   })
+
+  if (!world) return
+  for (const [name, role] of Object.entries(sceneFor(sceneId).cast)) {
+    if (role.box && boxes[sceneId]) world.setBox(name, boxes[sceneId])
+  }
+}
+
+const sceneAt = () => {
+  const screen = window.innerHeight
+  const line = window.scrollY + screen * READING_LINE
+  let current = marks[0]
+  for (const mark of marks) {
+    if (mark.top - (isEncounter(mark.id) ? screen * ENCOUNTER_LEAD : 0) > line) break
+    current = mark
+  }
+  return current
+}
+
+const updateScene = () => {
+  if (!marks.length) return
+  const mark = sceneAt()
+  activeId.value = mark.chapter
+  if (mark.id === sceneId) return
+  sceneId = mark.id
+  if (entrancePlayed || !worldReady.value) setScene(sceneId)
 }
 
 const playEntrance = () => {
   if (entrancePlayed || !world || !worldReady.value || !entered.value) return
   entrancePlayed = true
-  if (activeId.value !== 'home') {
-    flyTo(activeId.value, 0)
-    return
-  }
-  const { veil: _veil, ...home } = perchFor('home')
-  gsap.fromTo(world.pose, { ...ENTRANCE }, { ...home, duration: 1.4, ease: 'expo.out', overwrite: 'auto' })
+  // every creature starts parked off stage, so the first scene is also the fly-in
+  setScene(sceneId, sceneId === 'home' ? 1.4 : 0)
 }
 
 const lockScroll = (locked) => {
   document.documentElement.classList.toggle('is-locked', locked)
   if (locked) scroll?.lenis.stop()
   else scroll?.lenis.start()
+}
+
+const scrollTo = (top, smooth = false) => {
+  if (scroll) scroll.lenis.scrollTo(top, smooth ? { duration: 0.6 } : { immediate: true, force: true })
+  else window.scrollTo({ top, behavior: 'instant' })
 }
 
 const navigate = (id) => {
@@ -142,18 +228,33 @@ const navigate = (id) => {
   history.replaceState(null, '', id === 'home' ? location.pathname : `#${id}`)
 }
 
-const toggleMotion = () => {
-  motionOn.value = !motionOn.value
-  world?.setFlapping(motionOn.value)
+/**
+ * Run a change that reflows the page (a row opening while another closes) and
+ * keep `anchor` where the visitor's finger left it. If the anchor then runs off
+ * the bottom of the screen, bring as much of it into view as fits.
+ */
+const reflow = async (anchor, change) => {
+  const before = anchor.getBoundingClientRect().top
+  change()
+  await nextTick()
+  const shift = anchor.getBoundingClientRect().top - before
+  if (Math.abs(shift) > 1) scrollTo(window.scrollY + shift)
+  // the page changed height: every trigger and box below has moved
+  ScrollTrigger.refresh()
+
+  const rect = anchor.getBoundingClientRect()
+  const over = rect.bottom - (window.innerHeight - 16)
+  const room = rect.top - (navHeight() + 12)
+  if (over > 1 && room > 1) scrollTo(window.scrollY + Math.min(over, room), true)
 }
 
 provide('site', {
-  motionOn,
-  toggleMotion,
+  worldReady,
   lockScroll,
   navigate,
-  /** Hand an element to the dragon as its drag handle. Returns an unbind. */
-  bindDragonDrag: (el) => world?.bindDrag(el) ?? (() => {}),
+  reflow,
+  /** Hand an element to a creature as its drag handle. Returns an unbind. */
+  bindDrag: (el, name = 'dragon') => world?.bindDrag(el, name) ?? (() => {}),
 })
 
 const enter = () => {
@@ -173,14 +274,18 @@ const onScroll = (lenis) => {
   const progress = lenis.limit > 0 ? lenis.scroll / lenis.limit : 0
   if (progressRef.value) progressRef.value.style.transform = `scaleX(${progress})`
   world?.setScroll(progress, lenis.velocity / 45)
+  updateScene()
 }
 
-const onResize = () => {
+/** ScrollTrigger refreshes after a resize, a font swap or an accordion: the page has new measurements. */
+const onRefresh = () => {
+  measureStages()
   const tall = isTall()
   if (tall !== wasTall) {
     wasTall = tall
-    flyTo(activeId.value, 0.6)
+    if (entrancePlayed) setScene(sceneId, 0.6)
   }
+  updateScene()
 }
 
 const onAnchorClick = (e) => {
@@ -202,10 +307,10 @@ const startWorld = () => {
     },
     onReady: () => {
       worldReady.value = true
-      world.setFlapping(motionOn.value)
-      Object.assign(world.pose, entered.value ? perchFor(activeId.value) : ENTRANCE)
-      delete world.pose.veil
-      world.setFormation(formationFor(activeId.value), 0)
+      for (const [name, actor] of Object.entries(world.actors)) Object.assign(actor.pose, PARK[name])
+      measureStages()
+      updateScene()
+      world.setFormation(formationFor(sceneId), 0)
       playEntrance()
     },
     onError: () => {
@@ -219,35 +324,21 @@ const startWorld = () => {
 const setupMotion = async () => {
   scroll = createCinematicScroll(onScroll)
   if (titleOpen.value) lockScroll(true)
+  ScrollTrigger.addEventListener('refresh', onRefresh)
   startWorld()
 
   // line splits need the real fonts; never wait on them for long
   await Promise.race([document.fonts.ready, new Promise((resolve) => setTimeout(resolve, 1500))])
   if (!scroll) return
 
-  motionCtx = gsap.context(() => {
-    chapters.forEach(({ id }) => {
-      const el = document.getElementById(id)
-      if (!el) return
-      ScrollTrigger.create({
-        trigger: el,
-        start: 'top 55%',
-        end: 'bottom 55%',
-        onToggle: (self) => {
-          if (!self.isActive) return
-          activeId.value = id
-          if (entrancePlayed || !worldReady.value) flyTo(id)
-        },
-      })
-    })
-    buildReveals(appRef.value)
-  }, appRef.value)
+  motionCtx = gsap.context(() => buildReveals(appRef.value), appRef.value)
 
   ScrollTrigger.sort()
   ScrollTrigger.refresh()
 }
 
 const teardownMotion = () => {
+  ScrollTrigger.removeEventListener('refresh', onRefresh)
   motionCtx?.revert()
   motionCtx = null
   scroll?.destroy()
@@ -255,26 +346,35 @@ const teardownMotion = () => {
   world?.dispose()
   world = null
   worldReady.value = false
+  marks = []
   document.documentElement.classList.remove('is-locked')
 }
 
 /** The OS setting can flip while the page is open: honour it both ways. */
-const onReduceChange = () => {
+const onReduceChange = async () => {
+  motionOk.value = !reduceQuery.matches
   if (reduceQuery.matches) {
     teardownMotion()
     titleOpen.value = false
     entered.value = true
   } else {
     entrancePlayed = false
+    await nextTick()
     setupMotion()
   }
 }
+
+// an encounter band coming or going moves everything below it
+watch(encounters, async () => {
+  await nextTick()
+  ScrollTrigger.refresh()
+})
 
 onMounted(async () => {
   reduceQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
   reduceQuery.addEventListener('change', onReduceChange)
   document.addEventListener('click', onAnchorClick)
-  window.addEventListener('resize', onResize, { passive: true })
+  motionOk.value = !reduceQuery.matches
   wasTall = isTall()
 
   let seen = false
@@ -302,7 +402,6 @@ onMounted(async () => {
 onUnmounted(() => {
   reduceQuery?.removeEventListener('change', onReduceChange)
   document.removeEventListener('click', onAnchorClick)
-  window.removeEventListener('resize', onResize)
   teardownMotion()
 })
 </script>

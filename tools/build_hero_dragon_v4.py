@@ -425,6 +425,9 @@ def place_eyes(low, eye_mat):
             f"eye {side} at {tuple(round(v, 3) for v in world)} "
             f"normal={tuple(round(v, 3) for v in n)} r={eye_r:.3f}"
         )
+    # matrix_world is only current after a view-layer update: without this the
+    # last eye made still reads as sitting at the origin, and ships there
+    bpy.context.view_layer.update()
     for eye in eyes:
         mw = eye.matrix_world.copy()
         eye.parent = low

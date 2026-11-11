@@ -86,19 +86,33 @@ export function buildFormations(count) {
 }
 
 /**
- * Which shape each chapter gets and where it sits.
- * x, y: anchor in half-viewports. spin: radians per second around the vertical axis.
+ * Which shape each scene gets and where it sits (scene ids: scenes.js).
+ * x, y: anchor in half-viewports. z: depth, in spreads (negative = behind the creatures).
+ * spin: radians per second around the vertical axis.
  * spread: scales the whole shape. size: scales each crystal. `tall` overrides for phones.
+ * follow: a creature's name. The shape then travels with that creature: x, y
+ * are offsets in half-creatures and spread 1 is the creature's own height.
  */
 export const FORMATIONS = {
   home: { shape: 'drift', x: 0, y: 0 },
   about: { shape: 'pillar', x: -0.965, y: 0, spin: 0.25, size: 0.8, tall: { x: -0.9 } },
+  'encounter-naga': { shape: 'drift', x: 0, y: 0, size: 0.8 },
   tech: { shape: 'orbit', x: 0, y: 0, spin: 0.12, tall: { y: 0.1, spread: 0.7 } },
+  'encounter-whale': { shape: 'drift', x: 0, y: 0, size: 0.8 },
   experience: { shape: 'trail', x: 0, y: -0.9, size: 0.9 },
   projects: { shape: 'drift', x: 0, y: 0, size: 0.7 },
+  'encounter-phoenix': { shape: 'drift', x: 0, y: 0, size: 0.8 },
   services: { shape: 'gem', x: -0.52, y: -0.38, spin: 0.3, tall: { x: 0.62, y: 0.74, spread: 0.5 } },
   pricing: { shape: 'drift', x: 0, y: 0, size: 0.7 },
   certificates: { shape: 'orbit', x: 0.88, y: -0.44, spin: 0.2, spread: 0.42, tall: { x: 0.6, y: 0.78 } },
   'star-map': { shape: 'drift', x: 0, y: 0, size: 0.6 },
-  contact: { shape: 'world', x: 0.46, y: 0.4, spin: 0.16, tall: { x: 0, y: 0.3, spread: 0.72 } },
+  contact: {
+    shape: 'world',
+    x: 0.56,
+    y: -0.06,
+    spin: 0.16,
+    spread: 0.9,
+    // phones: the world sits behind the dragon like a halo and rides the page with it
+    tall: { follow: 'dragon', x: 0, y: -0.05, z: -0.9, spread: 1.7 },
+  },
 }

@@ -71,9 +71,6 @@
           </li>
           <li><a class="link" href="https://github.com/wankimmy" target="_blank" rel="noopener noreferrer">GitHub</a></li>
         </ul>
-        <button type="button" class="btn btn--line menu__motion" :aria-pressed="!site.motionOn.value" @click="site.toggleMotion">
-          {{ site.motionOn.value ? 'Pause motion' : 'Resume motion' }}
-        </button>
       </aside>
     </div>
   </div>

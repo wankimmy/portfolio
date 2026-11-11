@@ -34,10 +34,12 @@ owner's own asset and voice, so it cannot be moved to another brand.
 
 - Idea: your career is a save file; the dragon is the familiar that travels it with you.
 - Metaphor: RPG title screen, status sheet, quest log, shop.
-- Signature: a pearl-scaled dragon that leaves the hero, perches beside each chapter as you scroll, and comes back
-  at the last call to action. You can grab and spin it. A swarm of crystal shards travels with it and takes a new
-  shape per chapter (orbit, save pillar, trail, the sigil) until, at the end, the shards close into a finished world
-  with the gold sigil at its core: the "world builder" line made literal.
+- Signature: a pearl-scaled dragon that opens the page and comes back at the last call to action, and a small
+  bestiary that shares the sky with it. Each of the other creatures (a naga, a sky whale, a phoenix) has its own
+  band of open sky before the chapter it belongs to, then stays on as a dim companion behind that chapter. You can
+  grab and spin any of them. A swarm of crystal shards takes a new shape per chapter (orbit, save pillar, trail,
+  the sigil) until, at the end, the shards close into a finished world with the gold sigil at its core: the
+  "world builder" line made literal.
 - Emotion: quiet awe, then trust.
 - Motion verb: glide.
 - Screenshot: giant name over a night sky, the dragon mid-flap behind it.
@@ -61,10 +63,17 @@ Dials: variance 9, motion 9, density 3.
 - Layout families: stage (hero), editorial split (status), kinetic rows (abilities), index list (quest log),
   pinned horizontal gallery (quests), numbered list (services), ledger rows (shop), compact list (trophies),
   canvas (star map), poster (footer).
-- Motion: world first, type second, chrome last. Headings reveal by masked lines. The dragon changes perch when a
-  chapter enters and banks with scroll speed. One GSAP ticker drives Lenis, ScrollTrigger and the WebGL render.
-- Signature touchpoints: title screen sigil, hero, section perches and crystal formations, pause menu, the 3D sigil
-  inside the finished world at the footer.
+- Layout families also include the encounter: a band of open sky with a small bestiary caption beside it.
+- Motion: world first, type second, chrome last. Headings reveal by masked lines. Whoever is on stage changes when
+  a scene enters (`src/world/scenes.js`) and banks with scroll speed. One GSAP ticker drives Lenis, ScrollTrigger
+  and the WebGL render. The dragon's wing beat is driven in code (`dragonFlight.js`): a quick push down, a slower
+  recovery, the wing tips a beat behind the shoulder, the body riding the lift.
+- Creatures never sit under the header or the copy by accident: where the page leaves them a box (`data-stage`),
+  they fit themselves to it. Phones show a creature only in such a box: the hero, the encounters, the footer.
+- Signature touchpoints: title screen sigil, hero, encounters, crystal formations, pause menu, the 3D sigil inside
+  the finished world at the footer.
+- No on-page motion switch (owner removed it, 2026-11-11). The operating system's reduced-motion setting still
+  turns all of it off.
 
 ## Content states
 
@@ -76,9 +85,12 @@ Dials: variance 9, motion 9, density 3.
 - Partial: a project without a live link shows no link.
 - Success: not applicable, no forms.
 - Permission: not applicable.
-- Reduced motion: no smooth scroll, no WebGL, no scrub, no title screen; poster and all content visible.
+- Reduced motion: no smooth scroll, no WebGL, no scrub, no title screen, no encounter bands; poster and all
+  content visible.
 
 ## Known limits
 
 - The site is a client-rendered Vue app, so with JavaScript off only the `<noscript>` summary shows.
 - Dragon geometry comes from one AI-generated mesh; the build adds surface detail, not new anatomy.
+- The naga, sky whale and phoenix are modelled and animated in code (`src/world/creatures/`), with generated
+  surface textures. They are stylised next to the dragon's baked hide.
