@@ -55,8 +55,8 @@ float snoise(vec3 v) {
 }
 // the fold field: a warped noise whose zero lines wind like sulci (p in brain units)
 float folds(vec3 p) {
-  float w = snoise(p * 0.6 + 3.1);
-  return snoise(p * 1.45 + vec3(0.6, -0.45, 0.3) * w);
+  float w = snoise(p * 0.7 + 3.1);
+  return snoise(p * 1.85 + vec3(0.55, -0.4, 0.3) * w);
 }
 `
 
@@ -102,25 +102,83 @@ void main() {
   float facing = abs(dot(N, V));
   float rim = pow(1.0 - facing, 2.4);
   float lam = max(dot(N, normalize(vec3(-0.35, 0.75, 0.55))), 0.0);
-  float line = 0.0;
+  // the folds glow: a thin hot core with a soft halo round it, like light running along the sulci
+  float core = 0.0;
+  float halo = 0.0;
   if (vKind < 0.5) {
-    float n = folds(vP);
+    float n = abs(folds(vP));
     float aa = fwidth(n);
-    line = 1.0 - smoothstep(0.015, 0.05 + aa * 1.5, abs(n));
+    core = 1.0 - smoothstep(0.008, 0.03 + aa * 1.5, n);
+    halo = 1.0 - smoothstep(0.0, 0.16, n);
   } else if (vKind < 1.5) {
     // folia: fine curved stripes wrapping the cerebellum
     vec3 q = vP - uCereb;
     float f = sin((q.y - 0.22 * q.x * q.x) * 21.0);
     float aa = fwidth(f);
-    line = smoothstep(0.55 - aa, 0.95, f);
+    core = smoothstep(0.8 - aa, 0.98, f);
+    halo = smoothstep(0.2, 0.98, f);
   }
-  float body = 0.05 + 0.13 * lam + 0.62 * rim + (vKind > 1.5 ? 0.12 : 0.0);
-  vec3 col = vTint * (body + line * (0.32 + 0.4 * lam) * (0.35 + 0.65 * facing));
+  float body = 0.04 + 0.1 * lam + 0.7 * rim + (vKind > 1.5 ? 0.14 : 0.0);
+  float shine = (0.35 + 0.65 * facing) * (0.55 + 0.45 * lam);
+  vec3 hot = mix(vTint, vec3(1.0), 0.55);
+  vec3 col = vTint * (body + 0.22 * halo * shine) + hot * core * 0.75 * shine;
   gl_FragColor = vec4(col, 1.0);
 }
 `
 
 const softplus = (v, k) => Math.log1p(Math.exp(v * k)) / k
+
+const HOLO = [0.3, 0.86, 1.0] // the hologram's cyan
+const HOLO_BACK = [0.42, 0.5, 1.0] // and the blue-violet it fades to at the back
+
+// stardust on the surface: soft round motes that twinkle, cyan with a few violet ones
+const DUST_VERT = /* glsl */ `
+attribute float aSeed;
+uniform float uTime;
+uniform float uDpr;
+varying float vSeed;
+varying float vTw;
+void main() {
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vSeed = aSeed;
+  vTw = 0.35 + 0.65 * pow(0.5 + 0.5 * sin(uTime * (0.8 + 2.2 * fract(aSeed * 7.3)) + aSeed * 40.0), 3.0);
+  gl_PointSize = (1.8 + 4.6 * fract(aSeed * 13.7) * fract(aSeed * 13.7)) * uDpr * (30.0 / -mv.z);
+  gl_Position = projectionMatrix * mv;
+}
+`
+const DUST_FRAG = /* glsl */ `
+varying float vSeed;
+varying float vTw;
+void main() {
+  float d = length(gl_PointCoord - 0.5);
+  float a = smoothstep(0.5, 0.0, d);
+  a *= a;
+  vec3 c = fract(vSeed * 3.1) > 0.82 ? vec3(0.75, 0.55, 1.0) : vec3(0.55, 0.95, 1.0);
+  gl_FragColor = vec4(c * a * vTw * 1.8, 1.0);
+}
+`
+
+// the glow round the outline: the same mesh pushed out a little, its back faces lit only at the rim
+const HALO_VERT = /* glsl */ `
+uniform float uScale;
+varying vec3 vN;
+varying vec3 vV;
+void main() {
+  vec4 mv = modelViewMatrix * vec4(position + normal * 0.16 * uScale, 1.0);
+  vN = normalize(normalMatrix * normal);
+  vV = -mv.xyz;
+  gl_Position = projectionMatrix * mv;
+}
+`
+const HALO_FRAG = /* glsl */ `
+varying vec3 vN;
+varying vec3 vV;
+void main() {
+  float f = abs(dot(normalize(vN), normalize(vV)));
+  float i = pow(clamp(0.7 - f, 0.0, 1.0), 2.2);
+  gl_FragColor = vec4(vec3(0.25, 0.7, 1.0) * i * 0.55, 1.0);
+}
+`
 
 /**
  * @param THREE the three.js module
@@ -152,8 +210,10 @@ export function buildBrainShell(THREE, { scale, regionAt, rgb, lite }) {
         pos.push(x * scale, y * scale, z * scale)
         const key = keyOf(x, y, z)
         keys.push(key)
-        const c = rgb[key] ?? [0.7, 0.75, 0.85]
-        tint.push(c[0], c[1], c[2])
+        // one hologram hue: cyan at the face shading to blue-violet at the back, a faint hint of the region
+        const c = rgb[key] ?? HOLO
+        const b = Math.min(1, Math.max(0, (x + 4.6) / 9.2))
+        for (let a = 0; a < 3; a += 1) tint.push((HOLO[a] + (HOLO_BACK[a] - HOLO[a]) * b) * 0.88 + c[a] * 0.12)
         kind.push(kindVal)
       }
       seams.push([base + j * (w + 1), base + j * (w + 1) + w, j === 0 || j === h])
@@ -265,5 +325,61 @@ export function buildBrainShell(THREE, { scale, regionAt, rgb, lite }) {
   const mesh = new THREE.Mesh(geo, mat)
   mesh.userData.base = tint.slice()
   mesh.userData.keys = keys
+
+  // stardust: motes scattered just above the cerebrum and cerebellum (seeded, the same every load)
+  let t = 987654
+  const rnd = () => {
+    t = (Math.imul(t, 1664525) + 1013904223) >>> 0
+    return t / 4294967296
+  }
+  const dustN = lite ? 1400 : 3200
+  const dPos = []
+  const dSeed = []
+  const vCount = pos.length / 3
+  for (let tries = 0; dSeed.length < dustN && tries < dustN * 6; tries += 1) {
+    const v = Math.floor(rnd() * vCount)
+    if (kind[v] > 1.5) continue
+    const lift = (0.02 + 0.16 * rnd() * rnd()) * scale
+    dPos.push(pos[3 * v] + nrm[3 * v] * lift, pos[3 * v + 1] + nrm[3 * v + 1] * lift, pos[3 * v + 2] + nrm[3 * v + 2] * lift)
+    dSeed.push(rnd())
+  }
+  const dGeo = new THREE.BufferGeometry()
+  dGeo.setAttribute('position', new THREE.Float32BufferAttribute(dPos, 3))
+  dGeo.setAttribute('aSeed', new THREE.Float32BufferAttribute(dSeed, 1))
+  const dMat = new THREE.ShaderMaterial({
+    vertexShader: DUST_VERT,
+    fragmentShader: DUST_FRAG,
+    uniforms: { uTime: { value: 0 }, uDpr: { value: Math.min(window.devicePixelRatio || 1, 1.8) } },
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  })
+  const dust = new THREE.Points(dGeo, dMat)
+  dust.frustumCulled = false
+  mesh.add(dust)
+
+  const hMat = new THREE.ShaderMaterial({
+    vertexShader: HALO_VERT,
+    fragmentShader: HALO_FRAG,
+    uniforms: { uScale: { value: scale } },
+    side: THREE.BackSide,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  })
+  const halo = new THREE.Mesh(geo, hMat)
+  halo.raycast = () => {} // the glow is not a place to tap
+  mesh.add(halo)
+
+  mesh.userData.tick = (time) => {
+    dMat.uniforms.uTime.value = time
+  }
+  mesh.userData.dispose = () => {
+    hMat.dispose()
+    dGeo.dispose()
+    dMat.dispose()
+    geo.dispose()
+    mat.dispose()
+  }
   return mesh
 }

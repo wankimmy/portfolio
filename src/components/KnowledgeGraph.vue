@@ -194,6 +194,7 @@ let touchOrbitCandidate = null
 const TOUCH_ORBIT_THRESHOLD = 10
 
 const SCALE = 2.35
+const NET_CYAN = [0.45, 0.9, 1.0] // the links' colour at rest, matching the brain's hologram
 
 function isNarrowViewport() {
   if (typeof window === 'undefined') return false
@@ -440,6 +441,7 @@ function initGraph(THREEModule) {
 
     projectLabels()
     projectRegions()
+    shell?.userData.tick?.(clock.elapsedTime)
     renderer.render(scene, camera)
   }
   animate()
@@ -477,8 +479,11 @@ function writeEdges(highlightId) {
       bright = connected ? 0.95 : 0.1
     }
 
-    const ca = domainRgb[link.a.domain] ?? [0.29, 0.56, 0.89]
-    const cb = domainRgb[link.b.domain] ?? [0.29, 0.56, 0.89]
+    // at rest the network glows in the hologram's cyan; a focus shows each link in its regions' colours
+    const rest = !highlightId && !focusedLobe.value
+    const ca = rest ? NET_CYAN : domainRgb[link.a.domain] ?? NET_CYAN
+    const cb = rest ? NET_CYAN : domainRgb[link.b.domain] ?? NET_CYAN
+    if (rest) bright = 0.3
     col[i6] = ca[0] * bright
     col[i6 + 1] = ca[1] * bright
     col[i6 + 2] = ca[2] * bright
@@ -949,7 +954,7 @@ onMounted(() => {
       return
     }
     // a click on the brain itself opens the region it landed in
-    const shellHit = shell ? raycaster.intersectObject(shell)[0] : null
+    const shellHit = shell ? raycaster.intersectObject(shell, false)[0] : null
     if (shellHit && !focusedLobe.value && !focused.value) {
       const key = shell.userData.keys[shellHit.face.a]
       if (key) focusLobe(key)
@@ -984,8 +989,7 @@ onUnmounted(() => {
   activePointers.clear()
 
   if (shell) {
-    shell.geometry.dispose()
-    shell.material.dispose()
+    shell.userData.dispose()
     shell = null
   }
 
