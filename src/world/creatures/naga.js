@@ -1,6 +1,8 @@
 // Gergasi, the river colossus, in the naga's place. Self-contained: THREE is handed in.
-// What shows is a Hunyuan3D sculpt (public/models/creature-kaiju*.glb) deformed by smooth weights;
-// the code-built serpent below is its fallback and still drives the springs and PEARL TIDE.
+// What shows is a Hunyuan3D sculpt (public/models/creature-kaiju*.glb) deformed by smooth weights,
+// turned a little to the left so the spines down its back show. Its move breathes real fire from its
+// own mouth with the dragon's fire module (dragonFire.js). The code-built serpent below is its
+// fallback and still drives the springs; PEARL TIDE only plays when the sculpt cannot load.
 //
 // The code serpent: the serpent-dragon of Tasik Chini.
 //
@@ -18,8 +20,12 @@
 // fall as slow rain and fade, with ripples where the stream broke and a soft mist (sprites).
 // Every offset is scaled by the room the page gives (roomUp, roomDown), so nothing crosses the band.
 
+import { createFire } from '../dragonFire.js'
+
 const KAIJU_URL = '/models/creature-kaiju.glb'
 const KAIJU_URL_LITE = '/models/creature-kaiju-lite.glb'
+const KAIJU_YAW = -0.58 // the rest turn: chest toward the left, the back's spines along the right edge
+const FIRE_AIM = [-1, 0.12, 0.3] // the breath's aim in the holder: left, a touch up and toward the viewer
 
 export async function createCreature(THREE, { envMap, lite }) {
   const TAU = Math.PI * 2
@@ -1319,7 +1325,10 @@ export async function createCreature(THREE, { envMap, lite }) {
     frillGeo.attributes.position.needsUpdate = true
     frillGeo.computeVertexNormals()
 
-    if (sculpt) deformSculpt(time, e, g1, s1)
+    if (sculpt) {
+      deformSculpt(time, e, g1, s1)
+      updateSculptFire(time, dt, lift, ru, rd, WR)
+    }
 
     // the move's effects: pearls and droplets, ripples where the stream breaks, and the mist
     const floorY = -rd * WR * 0.92
@@ -1471,19 +1480,29 @@ export async function createCreature(THREE, { envMap, lite }) {
     const wH = new Float32Array(n) // head and neck
     const wT = new Float32Array(n) // tail
     const wU = new Float32Array(n) // upper body: leans on the hips for the rear-back and the lunge
+    // the rest turn: x seen on screen is x cos + z sin. The snout is the left-most point up top.
+    const yc = Math.cos(KAIJU_YAW)
+    const ys = Math.sin(KAIJU_YAW)
+    let tipI = 0
     let tipX = Infinity
-    let tipY = 0
+    let minR = Infinity
+    let maxR = -Infinity
     for (let i = 0; i < n; i += 1) {
       const u = P0[3 * i] / hw
       const v = P0[3 * i + 1] / hh
       wH[i] = smooth(0.0, -0.45, u) * smooth(0.0, 0.45, v)
       wT[i] = smooth(0.12, 0.7, u) * smooth(0.55, 0.25, v)
       wU[i] = smooth(-0.3, 0.15, v) * smooth(0.5, 0.15, u)
-      if (v > 0.3 && P0[3 * i] < tipX) {
-        tipX = P0[3 * i]
-        tipY = P0[3 * i + 1]
+      const xr = P0[3 * i] * yc + P0[3 * i + 2] * ys
+      if (xr < minR) minR = xr
+      if (xr > maxR) maxR = xr
+      if (v > 0.3 && xr < tipX) {
+        tipX = xr
+        tipI = i
       }
     }
+    const tipY = P0[3 * tipI + 1]
+    const offX = -(minR + maxR) / 2 // re-centre the turned sculpt in its box
     geo.attributes.position.setUsage(THREE.DynamicDrawUsage)
     geo.deleteAttribute('normal') // flat-shaded: the shader derives each face
 
@@ -1517,25 +1536,35 @@ export async function createCreature(THREE, { envMap, lite }) {
     m.dispose()
 
     // the frame in group units: the sculpt fills the creature's box with room for the sway and the lunge
-    const fw = 2 * hw * 1.1
+    const fw = (maxR - minR) * 1.1
     const fh = 2 * hh * 1.08
     const hs = 2 / (Math.max(fw, fh) * s)
     const mesh = new THREE.Mesh(geo, mat)
     mesh.frustumCulled = false
+    mesh.rotation.y = KAIJU_YAW
+    mesh.position.x = offX
     const holder = new THREE.Group()
     holder.position.set(cxB, cyB, 0)
     holder.scale.setScalar(hs)
     holder.add(mesh)
     group.add(holder)
     for (const c of [bodyMesh, finMesh, tailMesh, headRoot]) c.visible = false
+    // the sculpt breathes fire, so the serpent's pearls, ripples and mist stay hidden
+    pearls.visible = false
+    for (const r of rings) r.visible = false
+    for (const sp of mists) sp.visible = false
+    // the fire lives in the holder (sculpt units, height 2, the dragon's scale) and leaves from the snout
+    const fire = createFire(THREE, { lite })
+    holder.add(fire.group)
+    const fireAim = new THREE.Vector3(...FIRE_AIM).normalize()
     size.x = fw * hs * s
     size.y = fh * hs * s
     reach.up = size.y / 2 + 0.05 * size.x
     reach.down = size.y / 2 + 0.15 * size.x
     // the move now comes from the kaiju: its mouth, its facing, and its middle for the mist to settle on
-    W = 2 * hw * hs
+    W = (maxR - minR) * hs
     const toG = (x, y) => [cxB + x * hs, cyB + y * hs]
-    const [mx0, my0] = toG(tipX + 0.06 * hw, tipY - 0.05 * hh)
+    const [mx0, my0] = toG(tipX + offX, tipY - 0.05 * hh)
     mouthRest[0] = mx0
     mouthRest[1] = my0
     mouthRest[2] = 0.05 * W
@@ -1545,8 +1574,47 @@ export async function createCreature(THREE, { envMap, lite }) {
     mcx = cxB
     mcy = cyB
     mcz = 0
-    sculpt = { geo, mat, tex, P0, pos, wH, wT, wU, n, hw, hh, hs }
+    sculpt = { geo, mat, tex, P0, pos, wH, wT, wU, n, hw, hh, hs, fire, fireAim, tipI, yc, ys, offX }
   }
+
+  // the fire's state for the move (dragonFire's contract), and the snout it leaves from
+  const fireBody = new THREE.Object3D() // identity: the mouth is handed over in holder space
+  const fireMouth = new THREE.Vector3()
+  const fireMove = { active: 0, gather: 0, breath: 0, breathT: 0, ember: 0, glow: 0, aim: 0, room: 1, lift: 0 }
+
+  /** One frame of the kaiju's fire: the jet leaves the snout as it moves with the lean and the nod. */
+  function updateSculptFire(time, dt, lift, ru, rd, WR) {
+    const S = sculpt
+    const t = moveT
+    const on = t >= 0
+    fireMove.active = on ? 1 : 0
+    fireMove.gather = on ? smooth(0.2, 0.9, t) * (1 - smooth(0.95, 1.1, t)) : 0
+    fireMove.breath = on ? smooth(1.0, 1.15, t) * (1 - smooth(2.4, 2.8, t)) : 0
+    fireMove.breathT = on ? Math.min(1.6, Math.max(0, t - 1.0)) : 0
+    fireMove.ember = on ? smooth(2.5, 2.8, t) * (1 - smooth(3.2, 4.1, t)) : 0
+    fireMove.glow = Math.min(1, fireMove.breath * (1 - 0.5 * (fireMove.breathT / 1.6)) + fireMove.gather * 0.35)
+    fireMove.room = lift
+    // the snout as it is this frame (the head leans and nods), turned like the mesh, a touch ahead
+    const k3 = 3 * S.tipI
+    const x = S.pos[k3]
+    const z = S.pos[k3 + 2]
+    fireMouth.set(x * S.yc + z * S.ys + S.offX, S.pos[k3 + 1], -x * S.ys + z * S.yc)
+    // the snout tip is the upper jaw: the breath leaves the open mouth, a little below and behind it
+    fireMouth.x += 0.09 * S.hw
+    fireMouth.y -= 0.17 * S.hh
+    // the page's band in holder units, measured from the creature's middle
+    const top = (ru * WR * 0.92) / S.hs
+    const bottom = (-rd * WR * 0.92) / S.hs
+    fireIdle = on ? 0 : fireIdle + dt
+    if (!S.fire.group.visible && !on) return
+    // after the move the embers and smoke get a few seconds to die out, then the pools are cleared
+    if (fireIdle > 3) {
+      S.fire.reset()
+      return
+    }
+    S.fire.update(Math.min(dt, 0.05), fireBody, fireMouth, S.fireAim, fireMove, top, bottom, time)
+  }
+  let fireIdle = 0
 
   // one frame of the kaiju's motion: breath, tail sway with the springs' lag, the rear-back and the lunge
   function deformSculpt(time, e, g1, s1) {
@@ -1613,9 +1681,9 @@ export async function createCreature(THREE, { envMap, lite }) {
       p[k3 + 2] = z
     }
     S.geo.attributes.position.needsUpdate = true
-    // a cold glow wells up through the scales as it exhales
-    const gl = 0.35 * s1 + 0.1 * g1
-    S.mat.emissive.setRGB(0.04 * gl, 0.3 * gl, 0.26 * gl)
+    // firelight wells up on the scales as it breathes
+    const gl = 0.3 * fireMove.glow
+    S.mat.emissive.setRGB(1.0 * gl, 0.42 * gl, 0.12 * gl)
   }
 
   try {
@@ -1627,6 +1695,8 @@ export async function createCreature(THREE, { envMap, lite }) {
   const dispose = () => {
     disposed = true
     if (sculpt) {
+      sculpt.fire.reset()
+      sculpt.fire.dispose()
       sculpt.geo.dispose()
       sculpt.mat.dispose()
       for (const t of sculpt.tex) t.dispose()

@@ -119,6 +119,7 @@ import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
 import { BRAIN, createGraphForce, REGIONS } from '../lib/graphForce.js'
+import { buildBrainShell } from '../lib/brainShell.js'
 import { domains, edges, nodes } from '../lib/knowledgeData.js'
 
 const domainsByKey = Object.fromEntries(domains.map((d) => [d.key, d]))
@@ -158,7 +159,7 @@ let nodeMeshes = []
 let edgeLine = null
 let edgePosAttr = null
 let edgeColAttr = null
-let shell = null // the brain outline: a point cloud of folds
+let shell = null // the brain: a glassy mesh with folds
 let swayT = 0
 let raycaster = null
 let pointer = null
@@ -406,14 +407,13 @@ function initGraph(THREEModule) {
   })
   edgeLine = new THREE.LineSegments(edgeGeo, edgeMat)
   graphGroup.add(edgeLine)
-  shell = buildShell(isNarrowViewport() ? 4200 : 9000)
+  shell = buildBrainShell(THREE, { scale: SCALE, regionAt, rgb: domainRgb, lite: isNarrowViewport() })
   graphGroup.add(shell)
   writeEdges(null)
   applyHoverDim(null)
   fitCameraToGraph(true, { resetZoom: true })
 
   raycaster = new THREE.Raycaster()
-  raycaster.params.Points.threshold = 0.3 // a click near the outline counts as on it
   pointer = new THREE.Vector2()
 
   clock = new THREE.Clock()
@@ -596,101 +596,10 @@ function regionAt(x, y, z) {
   return best
 }
 
-/**
- * The brain's outline as points on its surface, kept only along winding ridges so they read as
- * folds (gyri), with the gap between the hemispheres, the cerebellum's fine stripes and the stem.
- * Deterministic: the same brain every load.
- */
-function buildShell(count) {
-  let t = 1234567
-  const rnd = () => {
-    t += 0x6d2b79f5
-    let r = Math.imul(t ^ (t >>> 15), 1 | t)
-    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r)
-    return ((r ^ (r >>> 14)) >>> 0) / 4294967296
-  }
-  const pos = []
-  const col = []
-  const push = (x, y, z, key, k) => {
-    pos.push(x * SCALE, y * SCALE, z * SCALE)
-    const c = domainRgb[key] ?? [0.7, 0.75, 0.85]
-    col.push(c[0] * k, c[1] * k, c[2] * k)
-    pointKeys.push(key)
-  }
-  const pointKeys = []
-  const C = BRAIN.cerebrum
-  const B = BRAIN.cerebellum
-  const S = BRAIN.stem
-  const want = { cerebrum: count * 0.78, cerebellum: count * 0.15, stem: count * 0.07 }
-  let tries = 0
-  let n = 0
-  while (n < want.cerebrum && tries < count * 40) {
-    tries += 1
-    // a direction on the unit sphere
-    const uz = rnd() * 2 - 1
-    const a = rnd() * Math.PI * 2
-    const rr = Math.sqrt(1 - uz * uz)
-    const ux = rr * Math.cos(a)
-    const uy = rr * Math.sin(a)
-    if (uy < -0.75) continue // the underside stays open
-    // winding ridges: a folded pattern of sines on the direction
-    const f = Math.sin(9 * ux + 3.2 * Math.sin(4 * uy + 1.7 * uz) + 2.1 * Math.sin(5 * uz))
-    const g = Math.sin(8 * uy + 2.6 * Math.sin(5 * ux - 2 * uz))
-    if (Math.abs(f * 0.65 + g * 0.35) > 0.32) continue
-    let s1 = 1 + 0.03 * (f + g)
-    // the longitudinal fissure: a groove down the middle of the top
-    const midline = Math.abs(uz)
-    if (midline < 0.1 && uy > -0.2) {
-      if (midline < 0.035) continue
-      s1 *= 0.93
-    }
-    const x = C.c[0] + ux * C.r[0] * s1
-    const y = C.c[1] + uy * C.r[1] * s1 * (uy < 0 ? 0.88 : 1)
-    const z = C.c[2] + uz * C.r[2] * s1
-    push(x, y, z, regionAt(x, y, z), 0.7 + 0.3 * rnd())
-    n += 1
-  }
-  n = 0
-  tries = 0
-  while (n < want.cerebellum && tries < count * 40) {
-    tries += 1
-    const uz = rnd() * 2 - 1
-    const a = rnd() * Math.PI * 2
-    const rr = Math.sqrt(1 - uz * uz)
-    const ux = rr * Math.cos(a)
-    const uy = rr * Math.sin(a)
-    if (Math.sin(uy * 24 + 0.6 * Math.sin(ux * 6)) < 0.35) continue // the folia: fine horizontal stripes
-    push(B.c[0] + ux * B.r[0], B.c[1] + uy * B.r[1], B.c[2] + uz * B.r[2], 'iot', 0.7 + 0.3 * rnd())
-    n += 1
-  }
-  for (let i = 0; i < want.stem; i += 1) {
-    const a = rnd() * Math.PI * 2
-    const y = S.y0 + rnd() * (S.y1 - S.y0)
-    // the stem narrows as it runs down
-    const rad = S.rad * (0.85 + 0.25 * ((y - S.y0) / (S.y1 - S.y0)))
-    push(S.x + Math.cos(a) * rad, y, S.z + Math.sin(a) * rad, 'ventures', 0.7 + 0.3 * rnd())
-  }
-  const geo = new THREE.BufferGeometry()
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
-  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3))
-  const mat = new THREE.PointsMaterial({
-    size: isNarrowViewport() ? 0.1 : 0.085,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.9,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  })
-  const points = new THREE.Points(geo, mat)
-  points.userData.base = col.slice()
-  points.userData.keys = pointKeys
-  return points
-}
-
 /** Brighten one region of the outline and dim the rest (null: all at rest). */
 function tintShell(key) {
   if (!shell) return
-  const col = shell.geometry.attributes.color.array
+  const col = shell.geometry.attributes.aTint.array
   const base = shell.userData.base
   const keys = shell.userData.keys
   for (let i = 0; i < keys.length; i += 1) {
@@ -699,7 +608,7 @@ function tintShell(key) {
     col[3 * i + 1] = base[3 * i + 1] * k
     col[3 * i + 2] = base[3 * i + 2] * k
   }
-  shell.geometry.attributes.color.needsUpdate = true
+  shell.geometry.attributes.aTint.needsUpdate = true
 }
 
 /** Fly the camera to a point in the graph (group-local), keeping the current view direction. */
@@ -1042,7 +951,7 @@ onMounted(() => {
     // a click on the brain itself opens the region it landed in
     const shellHit = shell ? raycaster.intersectObject(shell)[0] : null
     if (shellHit && !focusedLobe.value && !focused.value) {
-      const key = shell.userData.keys[shellHit.index]
+      const key = shell.userData.keys[shellHit.face.a]
       if (key) focusLobe(key)
     } else if (focused.value || focusedLobe.value) {
       clearFocus()

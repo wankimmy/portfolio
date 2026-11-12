@@ -26,8 +26,53 @@ export const REGIONS = {
   ventures: { at: [1.25, -3.1, 0], part: 'stem' },
 }
 
+/** Distance from (x, y) to the segment a-b. */
+function segDist(x, y, ax, ay, bx, by) {
+  const vx = bx - ax
+  const vy = by - ay
+  const t = Math.min(1, Math.max(0, ((x - ax) * vx + (y - ay) * vy) / (vx * vx + vy * vy)))
+  return Math.hypot(x - ax - vx * t, y - ay - vy * t)
+}
+
+const smooth = (a, b, x) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)))
+  return t * t * (3 - 2 * t)
+}
+
+/**
+ * How far the cerebrum's surface reaches along a unit direction, as a share of its ellipsoid.
+ * A flat base that hangs low under the temporal lobe and sits high under the frontal and
+ * occipital lobes, plus the grooves of the Sylvian fissure and the central sulcus on the
+ * outer faces. The mesh and the containment share it, so nodes stay inside what is drawn.
+ */
+export function cerebrumReach(ux, uy, uz) {
+  let s = 1
+  if (uy < 0) {
+    const h = 0.5 + 0.42 * Math.exp(-(((ux + 0.15) / 0.38) ** 2))
+    s = Math.pow(1 + Math.pow(-uy / h, 6), -1 / 6) // a soft min(1, h / -uy): the flat base
+  }
+  const lateral = smooth(0.2, 0.5, Math.abs(uz))
+  const sylvian = segDist(ux, uy, -0.62, -0.3, 0.28, 0.04)
+  s *= 1 - 0.085 * lateral * Math.exp(-((sylvian / 0.05) ** 2))
+  const central = segDist(ux, uy, -0.05, 0.98, -0.3, 0.12)
+  s *= 1 - 0.045 * smooth(0.08, 0.25, Math.abs(uz)) * Math.exp(-((central / 0.035) ** 2))
+  return s
+}
+
 /** Pull (px, py, pz) back inside a part; returns the correction to add (zero when inside). */
 function containOffset(part, x, y, z, margin) {
+  if (part === 'cerebrum') {
+    const E = BRAIN.cerebrum
+    const dx = (x - E.c[0]) / E.r[0]
+    const dy = (y - E.c[1]) / E.r[1]
+    const dz = (z - E.c[2]) / E.r[2]
+    const e = Math.hypot(dx, dy, dz)
+    if (e < 1e-6) return [0, 0, 0]
+    const lim = margin * cerebrumReach(dx / e, dy / e, dz / e)
+    if (e <= lim) return [0, 0, 0]
+    const k = 1 - lim / e
+    return [-(x - E.c[0]) * k, -(y - E.c[1]) * k, -(z - E.c[2]) * k]
+  }
   if (part === 'stem') {
     const S = BRAIN.stem
     const cy = Math.min(S.y1, Math.max(S.y0, y))
