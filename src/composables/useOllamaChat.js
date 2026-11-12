@@ -6,9 +6,9 @@
 import { SYSTEM_PROMPT } from '../lib/chatPrompt.js'
 
 const CHAT_ENDPOINT = '/api/ollama/chat'
-// Picked on 2026-11-12 from a test of eight Ollama Cloud models on visitor questions: the most
-// grounded (no invented facts), plain text, about a second to answer.
-const DEFAULT_MODEL = import.meta.env.VITE_OLLAMA_MODEL || 'deepseek-v4.1-flash'
+// Picked on 2026-11-12 from a test of eight Ollama Cloud models on visitor questions, then timed live:
+// grounded, plain text, and the first words in about a second (deepseek-v4.1-flash took 3-11 s).
+const DEFAULT_MODEL = import.meta.env.VITE_OLLAMA_MODEL || 'mimo-v2.6-flash'
 
 /** Keep request payloads small: only the most recent turns are sent. */
 const MAX_HISTORY_MESSAGES = 12

@@ -47,7 +47,7 @@
           <p class="chat-panel__title">Safwan AI</p>
           <p class="chat-panel__status">
             <span class="chat-panel__dot" aria-hidden="true"></span>
-            AI tech advisor · powered by DeepSeek
+            AI tech advisor · powered by MiMo
           </p>
         </div>
         <button type="button" class="chat-panel__close" aria-label="Close chat" @click="closeChat">
